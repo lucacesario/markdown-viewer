@@ -24,3 +24,11 @@ pub fn read_file(path: &str) -> Result<String, std::io::Error> {
 pub fn write_file(path: &str, content: &str) -> Result<(), std::io::Error> {
     fs::write(path, content)
 }
+
+pub fn pick_pdf_file() -> Option<String> {
+    rfd::FileDialog::new()
+        .add_filter("PDF document", &["pdf"])
+        .set_file_name("document.pdf")
+        .save_file()
+        .map(|p| p.to_string_lossy().to_string())
+}

@@ -6,6 +6,17 @@ use wry::WebView;
 use crate::file_ops;
 use crate::state::AppState;
 
+use webview2_com::Microsoft::Web::WebView2::Win32::{
+    ICoreWebView2_2,
+    ICoreWebView2_7,
+    ICoreWebView2Environment6,
+};
+
+use webview2_com::PrintToPdfCompletedHandler;
+use wry::WebViewExtWindows;
+
+use windows::core::{Interface, PCWSTR};
+
 #[derive(Deserialize)]
 struct IpcMessage {
     command: String,
@@ -133,6 +144,109 @@ pub fn handle_ipc_message(
                     "content": content,
                     "title": title
                 }));
+            }
+        }
+        "export_pdf" => {
+            if let Some(path) = file_ops::pick_pdf_file() {
+                send_to_js(
+                    webview,
+                    "pdf_path_selected",
+                    &serde_json::json!({
+                        "path": path
+                    }),
+                );
+            }
+        }
+        "export_pdf_to_path" => {
+            if let Some(path) = parsed.path {
+                unsafe {
+                    let controller = webview.controller();
+
+                    if let Ok(core) = controller.CoreWebView2() {
+                        if let Ok(core2) =
+                            core.cast::<ICoreWebView2_2>()
+                        {
+                            if let Ok(environment) =
+                                core2.Environment()
+                            {
+                                if let Ok(environment6) =
+                                    environment.cast::<
+                                        ICoreWebView2Environment6
+                                    >()
+                                {
+                                    if let Ok(settings) =
+                                        environment6.CreatePrintSettings()
+                                    {
+                                        let _ =
+                                            settings
+                                                .SetShouldPrintHeaderAndFooter(
+                                                    false
+                                                );
+
+                                        let _ =
+                                            settings
+                                                .SetShouldPrintBackgrounds(
+                                                    true
+                                                );
+
+                                        if let Ok(core7) =
+                                            core.cast::<ICoreWebView2_7>()
+                                        {
+                                            let wide_path:
+                                                Vec<u16> = path
+                                                .encode_utf16()
+                                                .chain(
+                                                    std::iter::once(0)
+                                                )
+                                                .collect();
+
+                                            let pdf_path =
+                                                PCWSTR(
+                                                    wide_path.as_ptr()
+                                                );
+
+                                            let saved_path =
+                                                path.clone();
+
+                                            let handler =
+                                                PrintToPdfCompletedHandler::create(
+                                                    Box::new(
+                                                        move |
+                                                            error_code,
+                                                            success
+                                                        | {
+                                                            if error_code
+                                                                .is_ok()
+                                                                && success
+                                                            {
+                                                                println!(
+                                                                    "PDF saved: {}",
+                                                                    saved_path
+                                                                );
+                                                            } else {
+                                                                eprintln!(
+                                                                    "PDF export failed"
+                                                                );
+                                                            }
+
+                                                            Ok(())
+                                                        },
+                                                    ),
+                                                );
+
+                                            let _ =
+                                                core7.PrintToPdf(
+                                                    pdf_path,
+                                                    &settings,
+                                                    &handler,
+                                                );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         _ => eprintln!("Unknown IPC command: {}", parsed.command),

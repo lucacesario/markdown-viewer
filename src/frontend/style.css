@@ -871,3 +871,417 @@ mark.find-match.find-active {
 
 #editor-container.active { animation: fadeIn 0.12s ease; }
 #preview-container.active { animation: fadeIn 0.15s ease; }
+
+/* ============================================
+   PDF / PRINT
+   Everything related to PDF appearance lives here
+   ============================================ */
+
+@media print {
+
+  /* ============================================
+     PDF CONFIG
+     ============================================ */
+
+  @page {
+    size: A4;
+    margin: 16mm 16mm 18mm;
+
+    @bottom-left {
+      content: "";
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 7.5pt;
+      font-weight: 400;
+      color: #7a8090;
+    }
+
+    @bottom-right {
+      content: counter(page) " / " counter(pages);
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 7.5pt;
+      font-weight: 400;
+      color: #7a8090;
+    }
+  }
+
+  /* ============================================
+     PDF PALETTE / TYPOGRAPHY
+     ============================================ */
+
+  body.pdf-paper {
+    --pdf-background: #ffffff;
+
+    --pdf-text: #39496b;
+    --pdf-heading: #36558f;
+    --pdf-secondary: #69758f;
+    --pdf-muted: #8a93a9;
+
+    --pdf-surface: #f6f7fa;
+    --pdf-raised: #eef1f5;
+
+    --pdf-border: #d9deea;
+    --pdf-border-subtle: #e7ebf2;
+
+    --pdf-h1-rule: rgba(54, 85, 143, 0.14);
+    --pdf-h2-rule: rgba(54, 85, 143, 0.10);
+
+    --pdf-link: #3d63a6;
+
+    --pdf-font-reading: Cambria, "Times New Roman", serif;
+    --pdf-font-ui: "Segoe UI", Arial, sans-serif;
+  }
+
+  /* Black text mode */
+  body.pdf-black {
+    --pdf-text: #222222;
+    --pdf-heading: #222222;
+    --pdf-secondary: #555555;
+    --pdf-muted: #777777;
+
+    --pdf-h1-rule: rgba(0, 0, 0, 0.13);
+    --pdf-h2-rule: rgba(0, 0, 0, 0.09);
+
+    --pdf-link: #222222;
+  }
+
+  /* ============================================
+     PAGE
+     ============================================ */
+
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+
+    background: var(--pdf-background, #ffffff) !important;
+    color: var(--pdf-text, #39496b) !important;
+
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ============================================
+     HIDE APPLICATION UI
+     ============================================ */
+
+  #titlebar,
+  #tab-bar,
+  #find-bar,
+  #statusbar,
+  #toc-panel,
+  #editor-container,
+  #drop-overlay,
+  #zoom-toast,
+  #preview-resize-handle {
+    display: none !important;
+  }
+
+  /* ============================================
+     PRINT CONTENT
+     ============================================ */
+
+  #content,
+  #preview-container {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+
+    background: var(--pdf-background, #ffffff) !important;
+  }
+
+  #preview-wrapper {
+    position: static !important;
+
+    width: 100% !important;
+    max-width: none !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #preview {
+    width: 100% !important;
+    max-width: none !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    font-family: var(
+      --pdf-font-reading,
+      Cambria,
+      "Times New Roman",
+      serif
+    ) !important;
+
+    font-size: 11.25pt !important;
+    line-height: 1.75 !important;
+
+    color: var(--pdf-text, #39496b) !important;
+
+    font-synthesis: none !important;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ============================================
+     HEADINGS
+     ============================================ */
+
+  #preview h1,
+  #preview h2,
+  #preview h3,
+  #preview h4,
+  #preview h5,
+  #preview h6 {
+    color: var(--pdf-heading, #36558f) !important;
+
+    break-after: avoid-page;
+    page-break-after: avoid;
+
+    font-synthesis: none !important;
+  }
+
+  #preview h1 {
+    padding-bottom: 0.22em !important;
+    border-bottom:
+      0.2px solid
+      var(--pdf-h1-rule, rgba(54, 85, 143, 0.14)) !important;
+  }
+
+  #preview h2 {
+    padding-bottom: 0.12em !important;
+    border-bottom:
+      0.2px solid
+      var(--pdf-h2-rule, rgba(54, 85, 143, 0.10)) !important;
+  }
+
+  /* ============================================
+     PARAGRAPHS / EMPHASIS
+     ============================================ */
+
+  #preview p {
+    color: var(--pdf-text, #39496b) !important;
+  }
+
+  #preview strong {
+    color: var(--pdf-text, #39496b) !important;
+    font-weight: 600;
+  }
+
+  #preview em {
+    color: var(--pdf-text, #39496b) !important;
+  }
+
+  /* ============================================
+     LINKS
+     ============================================ */
+
+  #preview a {
+    color: var(--pdf-link, #3d63a6) !important;
+    text-decoration: none !important;
+    border-bottom: none !important;
+  }
+
+  /* ============================================
+     CODE
+     ============================================ */
+
+  #preview code {
+    background: var(--pdf-raised, #eef1f5) !important;
+  }
+
+  #preview pre {
+    background: var(--pdf-surface, #f6f7fa) !important;
+
+    border:
+      0.5px solid
+      var(--pdf-border, #d9deea) !important;
+
+    white-space: pre-wrap !important;
+    word-break: break-word;
+
+    overflow: visible !important;
+
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  #preview pre code {
+    background: transparent !important;
+  }
+
+  /* ============================================
+     BLOCKQUOTES
+     ============================================ */
+
+  #preview blockquote {
+    color: var(--pdf-secondary, #69758f) !important;
+
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* ============================================
+     TABLES
+     ============================================ */
+
+  #preview table {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  #preview th,
+  #preview td {
+    border:
+      0.5px solid
+      var(--pdf-border, #d9deea) !important;
+  }
+
+  #preview th {
+    background: var(--pdf-raised, #eef1f5) !important;
+    color: var(--pdf-secondary, #69758f) !important;
+  }
+
+  /* ============================================
+     IMAGES
+     ============================================ */
+
+  #preview img {
+    max-width: 100% !important;
+    height: auto !important;
+
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* ============================================
+     LISTS
+     ============================================ */
+
+  #preview li::marker {
+    color: var(--pdf-muted, #8a93a9) !important;
+  }
+
+  /* ============================================
+     HORIZONTAL RULE
+     ============================================ */
+
+  #preview hr {
+    height: 0.5px !important;
+    border: none !important;
+
+    background:
+      linear-gradient(
+        90deg,
+        transparent,
+        var(--pdf-border, #d9deea),
+        transparent
+      ) !important;
+  }
+}
+
+/* ============================================
+   PDF EXPORT MODAL
+   ============================================ */
+
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+
+  background: rgba(0, 0, 0, 0.42);
+
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop.visible {
+  display: flex;
+}
+
+.modal-card {
+  width: 340px;
+  max-width: calc(100vw - 40px);
+
+  background: var(--bg-surface);
+  color: var(--text);
+
+  border: 1px solid var(--border);
+  border-radius: 10px;
+
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+
+  padding: 18px;
+}
+
+.modal-title {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.pdf-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  padding: 9px 0;
+
+  font-family: var(--font-body);
+  font-size: 12.5px;
+
+  color: var(--text-secondary);
+}
+
+.pdf-option-row select {
+  min-width: 110px;
+
+  background: var(--bg-base);
+  color: var(--text);
+
+  border: 1px solid var(--border);
+  border-radius: 5px;
+
+  padding: 5px 8px;
+}
+
+.pdf-option-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+
+  margin-top: 18px;
+}
+
+.modal-actions button {
+  min-width: 72px;
+
+  border: 1px solid var(--border);
+  border-radius: 6px;
+
+  background: var(--bg-raised);
+  color: var(--text);
+
+  padding: 7px 12px;
+
+  cursor: pointer;
+}
+
+.modal-actions button:hover {
+  background: var(--bg-overlay);
+}
+
+.modal-actions button.primary {
+  color: var(--accent-hover);
+  border-color: var(--accent);
+}

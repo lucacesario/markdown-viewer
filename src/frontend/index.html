@@ -17,6 +17,15 @@
       <button id="btn-save" title="Save (Ctrl+S)">
         <svg viewBox="0 0 16 16" fill="none"><path d="M3 1.5h8.5L14 4v9.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.2"/><rect x="5" y="1.5" width="5" height="4" rx="0.5" stroke="currentColor" stroke-width="1.2"/><rect x="4.5" y="9" width="7" height="4.5" rx="0.5" stroke="currentColor" stroke-width="1.2"/></svg>
       </button>
+      <button id="btn-print" title="Export PDF (Ctrl+P)">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M4 6V1.5h8V6" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="2" y="6" width="12" height="6" rx="1.5"
+                stroke="currentColor" stroke-width="1.2"/>
+          <path d="M4 10h8v4.5H4z"
+                stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+      </button>
       <div class="titlebar-sep"></div>
       <button id="btn-toggle" title="Toggle Preview (Ctrl+E)">
         <svg id="icon-preview" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.2"/></svg>
@@ -93,6 +102,60 @@
     <span id="status-counts"></span>
     <span id="status-info"></span>
   </div>
+  
+  <div id="pdf-options-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-title">Export PDF</div>
+
+      <label class="pdf-option-row">
+        <span>Text colour</span>
+        <select id="pdf-color">
+          <option value="blue" selected>Blue</option>
+          <option value="black">Black</option>
+        </select>
+      </label>
+
+      <label class="pdf-option-row">
+        <span>Paper size</span>
+        <select id="pdf-paper-size">
+          <option value="a4" selected>A4</option>
+          <option value="letter">Letter</option>
+        </select>
+      </label>
+
+      <label class="pdf-option-row">
+        <span>Orientation</span>
+        <select id="pdf-orientation">
+          <option value="portrait" selected>Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+      </label>
+
+      <label class="pdf-option-row">
+        <span>Margins</span>
+        <select id="pdf-margins">
+          <option value="default" selected>Default</option>
+          <option value="narrow">Narrow</option>
+          <option value="wide">Wide</option>
+        </select>
+      </label>
+
+      <label class="pdf-option-row">
+        <span>Show timestamp</span>
+        <input id="pdf-show-date" type="checkbox" checked>
+      </label>
+
+      <label class="pdf-option-row">
+        <span>Show page numbers</span>
+        <input id="pdf-show-pages" type="checkbox" checked>
+      </label>
+
+      <div class="modal-actions">
+        <button id="pdf-cancel">Cancel</button>
+        <button id="pdf-export-confirm" class="primary">Export</button>
+      </div>
+    </div>
+</div>
 
   <!-- __SCRIPTS__ -->
 </body>
