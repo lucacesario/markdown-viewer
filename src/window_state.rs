@@ -16,7 +16,7 @@ struct WindowState {
 
 fn config_path() -> PathBuf {
     let mut p = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    p.push("peekdown");
+    p.push("markdown-viewer");
     p.push("window_state.json");
     p
 }

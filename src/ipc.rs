@@ -135,7 +135,7 @@ pub fn handle_ipc_message(
             if let Some(ref path) = parsed.path {
                 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
                 let encoded = utf8_percent_encode(path, NON_ALPHANUMERIC).to_string();
-                let url = format!("http://peekdown.localhost/local-image?{}", encoded);
+                let url = format!("http://markdown-viewer.localhost/local-image?{}", encoded);
                 let script = format!(
                     "window.__setImage({}, {})",
                     serde_json::to_string(path).unwrap(),

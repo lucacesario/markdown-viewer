@@ -1,6 +1,6 @@
 [package]
-name = "peekdown"
-version = "1.2.1"
+name = "markdown-viewer"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]

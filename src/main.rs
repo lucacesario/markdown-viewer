@@ -92,7 +92,7 @@ fn main() {
     let proxy: EventLoopProxy<UserEvent> = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Peekdown - Untitled")
+        .with_title("Markdown Viewer - Untitled")
         .with_decorations(false)
         .with_inner_size(LogicalSize::new(
             size.0 as f64,
@@ -119,7 +119,7 @@ fn main() {
 
     let state_proto = Arc::clone(&app_state);
     let _webview = WebViewBuilder::new()
-        .with_custom_protocol("peekdown".to_string(), move |_id, request| {
+        .with_custom_protocol("markdown-viewer".to_string(), move |_id, request| {
             let uri = request.uri().path();
             if uri == "/" || uri == "/index.html" {
                 let st = state_proto.lock().unwrap();
@@ -167,7 +167,7 @@ fn main() {
                     .unwrap()
             }
         })
-        .with_url("http://peekdown.localhost/")
+        .with_url("http://markdown-viewer.localhost/")
         .with_ipc_handler(move |request| {
             let body = request.body().to_string();
             let _ = proxy_ipc.send_event(UserEvent::IpcMessage(body));

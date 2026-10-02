@@ -442,7 +442,7 @@ function updateWordCount() {
 
 // Recent Files
 function getRecentFiles() {
-  try { return JSON.parse(localStorage.getItem('peekdown-recent')) || []; } catch(e) { return []; }
+  try { return JSON.parse(localStorage.getItem('markdown-viewer-recent')) || []; } catch(e) { return []; }
 }
 
 function addRecentFile(path) {
@@ -452,7 +452,7 @@ function addRecentFile(path) {
   recent = recent.filter(function(r) { return r.path.replace(/\\/g, '/').toLowerCase() !== path.replace(/\\/g, '/').toLowerCase(); });
   recent.unshift({ path: path, filename: filename });
   if (recent.length > 10) recent = recent.slice(0, 10);
-  try { localStorage.setItem('peekdown-recent', JSON.stringify(recent)); } catch(e) {}
+  try { localStorage.setItem('markdown-viewer-recent', JSON.stringify(recent)); } catch(e) {}
 }
 
 function showRecentPanel() {
@@ -602,7 +602,7 @@ document.addEventListener('wheel', function(e) {
   var MIN_WIDTH = 300;
 
   var saved = null;
-  try { saved = localStorage.getItem('peekdown-preview-width'); } catch(e) {}
+  try { saved = localStorage.getItem('markdown-viewer-preview-width'); } catch(e) {}
   if (saved) preview.style.maxWidth = saved + 'px';
 
   var dragging = false;
@@ -628,12 +628,12 @@ document.addEventListener('wheel', function(e) {
     dragging = false;
     handle.classList.remove('dragging');
     document.body.classList.remove('preview-resizing');
-    try { localStorage.setItem('peekdown-preview-width', parseInt(preview.style.maxWidth)); } catch(e) {}
+    try { localStorage.setItem('markdown-viewer-preview-width', parseInt(preview.style.maxWidth)); } catch(e) {}
   });
 
   handle.addEventListener('dblclick', function() {
     preview.style.maxWidth = DEFAULT_WIDTH + 'px';
-    try { localStorage.setItem('peekdown-preview-width', DEFAULT_WIDTH); } catch(e) {}
+    try { localStorage.setItem('markdown-viewer-preview-width', DEFAULT_WIDTH); } catch(e) {}
   });
 })();
 
@@ -788,7 +788,7 @@ function getPdfOptions() {
 
 function savePdfOptions(options) {
   try {
-    localStorage.setItem('peekdown-pdf-options', JSON.stringify(options));
+    localStorage.setItem('markdown-viewer-pdf-options', JSON.stringify(options));
   } catch (e) {}
 }
 
@@ -797,7 +797,7 @@ function restorePdfOptions() {
 
   try {
     saved = JSON.parse(
-      localStorage.getItem('peekdown-pdf-options')
+      localStorage.getItem('markdown-viewer-pdf-options')
     );
   } catch (e) {}
 
@@ -1203,7 +1203,7 @@ function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   document.getElementById('icon-sun').style.display = theme === 'light' ? '' : 'none';
   document.getElementById('icon-moon').style.display = theme === 'light' ? 'none' : '';
-  try { localStorage.setItem('peekdown-theme', theme); } catch(e) {}
+  try { localStorage.setItem('markdown-viewer-theme', theme); } catch(e) {}
 }
 
 document.getElementById('btn-theme').addEventListener('click', function() {
@@ -1214,7 +1214,7 @@ document.getElementById('btn-theme').addEventListener('click', function() {
 // Init
 document.addEventListener('DOMContentLoaded', function() {
   var saved = null;
-  try { saved = localStorage.getItem('peekdown-theme'); } catch(e) {}
+  try { saved = localStorage.getItem('markdown-viewer-theme'); } catch(e) {}
   if (saved) setTheme(saved);
   TabManager.createTab(null, '');
   updateWordCount();

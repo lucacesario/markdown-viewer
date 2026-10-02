@@ -165,7 +165,7 @@ var TabManager = (function() {
   function updateWindowTitle() {
     var tab = getActiveTab();
     if (!tab) return;
-    var title = 'Peekdown - ' + tab.filename;
+    var title = 'Markdown Viewer - ' + tab.filename;
     if (tab.dirty) title += ' *';
     sendToRust('set_title', { title: title });
     setTitle(tab.filename + (tab.dirty ? ' *' : ''));
