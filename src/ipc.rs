@@ -89,15 +89,46 @@ pub fn handle_ipc_message(
             window.set_minimized(true);
         }
         "window_maximize" => {
-            window.set_maximized(!window.is_maximized());
+            let currently_maximized = window.is_maximized();
+
+            if currently_maximized {
+                // Leaving maximized mode.
+                window.set_maximized(false);
+
+                let (pos, size, _) =
+                    crate::window_state::load_window_state();
+
+                crate::window_state::save_window_state(
+                    pos,
+                    size,
+                    false,
+                );
+            } else {
+                // Save the current normal rectangle before maximizing.
+                let inner_size = window.inner_size();
+                let outer_pos = window.outer_position().unwrap_or_default();
+
+                crate::window_state::save_window_state(
+                    (outer_pos.x, outer_pos.y),
+                    (inner_size.width, inner_size.height),
+                    true,
+                );
+
+                window.set_maximized(true);
+            }
         }
         "window_close" => {
-            let inner_size = window.inner_size();
-            let outer_pos = window.outer_position().unwrap_or_default();
-            crate::window_state::save_window_state(
-                (outer_pos.x, outer_pos.y),
-                (inner_size.width, inner_size.height),
-            );
+            if !window.is_maximized() {
+                let inner_size = window.inner_size();
+                let outer_pos = window.outer_position().unwrap_or_default();
+
+                crate::window_state::save_window_state(
+                    (outer_pos.x, outer_pos.y),
+                    (inner_size.width, inner_size.height),
+                    false,
+                );
+            }
+
             std::process::exit(0);
         }
         "read_image" => {
@@ -145,6 +176,8 @@ pub fn handle_ipc_message(
                     "title": title
                 }));
             }
+            window.set_visible(true);
+
         }
         "export_pdf" => {
             if let Some(path) = file_ops::pick_pdf_file() {

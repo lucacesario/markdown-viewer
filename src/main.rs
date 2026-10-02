@@ -85,8 +85,8 @@ fn main() {
             }
         }
     }
-
-    let (pos, size) = window_state::load_window_state();
+    let (pos, size, was_maximized) =
+        window_state::load_window_state();
 
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     let proxy: EventLoopProxy<UserEvent> = event_loop.create_proxy();
@@ -94,10 +94,20 @@ fn main() {
     let window = WindowBuilder::new()
         .with_title("Peekdown - Untitled")
         .with_decorations(false)
-        .with_inner_size(LogicalSize::new(size.0 as f64, size.1 as f64))
-        .with_position(LogicalPosition::new(pos.0 as f64, pos.1 as f64))
+        .with_inner_size(LogicalSize::new(
+            size.0 as f64,
+            size.1 as f64,
+        ))
+        .with_position(LogicalPosition::new(
+            pos.0 as f64,
+            pos.1 as f64,
+        ))
+        .with_visible(false)
         .build(&event_loop)
         .unwrap();
+    if was_maximized {
+        window.set_maximized(true);
+    }
 
     let full_html = build_html();
     {
@@ -200,6 +210,8 @@ fn main() {
         .with_devtools(true)
         .build(&window)
         .expect("Failed to build WebView");
+    
+    // window.set_visible(true);
 
     // Store CLI file path to open once JS is ready
     if let Some(file_path) = cli_file {
@@ -211,36 +223,79 @@ fn main() {
 
         match event {
             Event::UserEvent(UserEvent::IpcMessage(msg)) => {
-                ipc::handle_ipc_message(&msg, &_webview, &window, &app_state);
+                ipc::handle_ipc_message(
+                    &msg,
+                    &_webview,
+                    &window,
+                    &app_state,
+                );
             }
+
             Event::WindowEvent {
                 event: WindowEvent::Resized(new_size),
                 ..
             } => {
                 let w = new_size.width as i32;
                 let h = new_size.height as i32;
+
                 unsafe {
                     let controller = _webview.controller();
-                    let _ = controller.SetBounds(RECT { left: 0, top: 0, right: w, bottom: h });
+
+                    let _ = controller.SetBounds(RECT {
+                        left: 0,
+                        top: 0,
+                        right: w,
+                        bottom: h,
+                    });
+
                     let mut host = HWND::default();
+
                     if controller.ParentWindow(&mut host).is_ok() {
-                        let _ = SetWindowPos(host, None, 0, 0, w, h,
-                            SWP_ASYNCWINDOWPOS | SWP_NOACTIVATE | SWP_NOZORDER);
+                        let _ = SetWindowPos(
+                            host,
+                            None,
+                            0,
+                            0,
+                            w,
+                            h,
+                            SWP_ASYNCWINDOWPOS
+                                | SWP_NOACTIVATE
+                                | SWP_NOZORDER,
+                        );
                     }
                 }
             }
+
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                let inner_size = window.inner_size();
-                let outer_pos = window.outer_position().unwrap_or_default();
-                window_state::save_window_state(
-                    (outer_pos.x, outer_pos.y),
-                    (inner_size.width, inner_size.height),
-                );
+                let maximized = window.is_maximized();
+
+                if maximized {
+                    let (pos, size, _) =
+                        window_state::load_window_state();
+
+                    window_state::save_window_state(
+                        pos,
+                        size,
+                        true,
+                    );
+                } else {
+                    let inner_size = window.inner_size();
+                    let outer_pos =
+                        window.outer_position().unwrap_or_default();
+
+                    window_state::save_window_state(
+                        (outer_pos.x, outer_pos.y),
+                        (inner_size.width, inner_size.height),
+                        false,
+                    );
+                }
+
                 *control_flow = ControlFlow::Exit;
             }
+
             _ => {}
         }
     });

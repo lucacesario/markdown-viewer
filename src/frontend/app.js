@@ -265,18 +265,173 @@ function toggleSplit() {
 }
 
 var splitPreviewTimer = null;
+
 function updateSplitPreview() {
   if (!splitMode) return;
+
   clearTimeout(splitPreviewTimer);
-  splitPreviewTimer = setTimeout(function() {
-    var tab = TabManager.getActiveTab();
-    var content = ($.editor || document.getElementById('editor')).value;
-    var html = marked.parse(content);
-    ($.preview || document.getElementById('preview')).innerHTML = html;
-    if (tab) tab.parsedHtml = html;
-    resolveLocalImages();
-  }, 150);
+
+  splitPreviewTimer =
+    setTimeout(function() {
+
+      var editor =
+        $.editor ||
+        document.getElementById('editor');
+
+      var preview =
+        $.preview ||
+        document.getElementById('preview');
+
+      var previewContainer =
+        $.previewContainer ||
+        document.getElementById(
+          'preview-container'
+        );
+
+      /*
+       * Capture the editor position before
+       * rebuilding the preview.
+       */
+      var scrollRatio =
+        getScrollRatio(editor);
+
+      var tab =
+        TabManager.getActiveTab();
+
+      var content =
+        editor.value;
+
+      var html =
+        marked.parse(content);
+
+      preview.innerHTML = html;
+
+      if (tab) {
+        tab.parsedHtml = html;
+      }
+
+      resolveLocalImages();
+
+      /*
+       * Re-apply the corresponding scroll
+       * position after the rendered document
+       * has changed height.
+       */
+      requestAnimationFrame(function() {
+        setScrollRatio(
+          previewContainer,
+          scrollRatio
+        );
+      });
+
+    }, 150);
 }
+
+// Split-view scroll synchronization
+
+var splitScrollSyncing = false;
+
+function getScrollRatio(element) {
+  var maxScroll =
+    element.scrollHeight -
+    element.clientHeight;
+
+  if (maxScroll <= 0) {
+    return 0;
+  }
+
+  return element.scrollTop / maxScroll;
+}
+
+function setScrollRatio(element, ratio) {
+  var maxScroll =
+    element.scrollHeight -
+    element.clientHeight;
+
+  if (maxScroll <= 0) {
+    element.scrollTop = 0;
+    return;
+  }
+
+  element.scrollTop =
+    Math.max(0, Math.min(1, ratio)) *
+    maxScroll;
+}
+
+function syncEditorToPreview() {
+  if (!splitMode || splitScrollSyncing) {
+    return;
+  }
+
+  var editor =
+    $.editor ||
+    document.getElementById('editor');
+
+  var previewContainer =
+    $.previewContainer ||
+    document.getElementById(
+      'preview-container'
+    );
+
+  splitScrollSyncing = true;
+
+  var ratio =
+    getScrollRatio(editor);
+
+  requestAnimationFrame(function() {
+    setScrollRatio(
+      previewContainer,
+      ratio
+    );
+
+    splitScrollSyncing = false;
+  });
+}
+
+function syncPreviewToEditor() {
+  if (!splitMode || splitScrollSyncing) {
+    return;
+  }
+
+  var editor =
+    $.editor ||
+    document.getElementById('editor');
+
+  var previewContainer =
+    $.previewContainer ||
+    document.getElementById(
+      'preview-container'
+    );
+
+  splitScrollSyncing = true;
+
+  var ratio =
+    getScrollRatio(previewContainer);
+
+  requestAnimationFrame(function() {
+    setScrollRatio(
+      editor,
+      ratio
+    );
+
+    splitScrollSyncing = false;
+  });
+}
+
+document
+  .getElementById('editor')
+  .addEventListener(
+    'scroll',
+    syncEditorToPreview
+  );
+
+document
+  .getElementById('preview-container')
+  .addEventListener(
+    'scroll',
+    syncPreviewToEditor
+  );
+
 
 // Word count
 function updateWordCount() {
@@ -988,13 +1143,48 @@ document.addEventListener('keydown', function(e) {
 // Window Controls
 document.getElementById('btn-minimize').addEventListener('click', function() { sendToRust('window_minimize'); });
 document.getElementById('btn-maximize').addEventListener('click', function() { sendToRust('window_maximize'); });
-document.getElementById('btn-close').addEventListener('click', function() {
-  if (TabManager.hasAnyDirty()) {
-    if (!confirm('You have unsaved changes. Close anyway?')) return;
-  }
-  sendToRust('window_close');
-});
+function openCloseConfirm() {
+  document
+    .getElementById('close-confirm-modal')
+    .classList.add('visible');
+}
 
+function closeCloseConfirm() {
+  document
+    .getElementById('close-confirm-modal')
+    .classList.remove('visible');
+}
+
+document
+  .getElementById('btn-close')
+  .addEventListener('click', function() {
+
+    if (TabManager.hasAnyDirty()) {
+      openCloseConfirm();
+      return;
+    }
+
+    sendToRust('window_close');
+  });
+
+document
+  .getElementById('close-cancel')
+  .addEventListener('click', closeCloseConfirm);
+
+document
+  .getElementById('close-confirm')
+  .addEventListener('click', function() {
+    closeCloseConfirm();
+    sendToRust('window_close');
+  });
+
+document
+  .getElementById('close-confirm-modal')
+  .addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeCloseConfirm();
+    }
+  });
 // Toolbar Buttons
 document.getElementById('btn-new').addEventListener('click', function() { TabManager.createTab(null, ''); });
 document.getElementById('btn-open').addEventListener('click', function() { sendToRust('open_file'); });

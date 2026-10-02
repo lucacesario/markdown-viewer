@@ -1285,3 +1285,10 @@ mark.find-match.find-active {
   color: var(--accent-hover);
   border-color: var(--accent);
 }
+
+.modal-message {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
