@@ -276,34 +276,76 @@ html, body {
   display: none;
   position: relative;
   height: 100%;
+  min-width: 0;
   background: var(--bg-base);
 }
 
-#editor-container.active { display: block; flex: 1; min-width: 0; }
+#editor-container.active {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
 
-#editor {
+#editor-shell {
+  display: flex;
+  flex: 1 1 auto;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+#line-numbers {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 100%;
+  box-sizing: border-box;
+
+  padding: 28px 8px 28px 4px;
+
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+
+  color: var(--text-dim);
+  opacity: 0.55;
+
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: calc(10.5px * var(--zoom));
+  line-height: calc(24.3px * var(--zoom));
+  font-variant-numeric: tabular-nums;
+
+  white-space: pre;
+  overflow: hidden;
+
+  user-select: none;
+  pointer-events: none;
+}
+
+#editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 0;
+  height: 100%;
+  box-sizing: border-box;
+
   background: var(--bg-base);
   color: var(--text);
+
   border: none;
   padding: 28px 32px;
+
   font-family: var(--font-mono);
   font-size: calc(13.5px * var(--zoom));
   line-height: 1.8;
+
   resize: none;
   outline: none;
   tab-size: 4;
   caret-color: var(--accent);
-}
 
-#editor::placeholder {
-  color: var(--text-dim);
-  font-style: italic;
-}
-
-#editor::selection {
-  background: var(--accent-glow);
+  overflow: auto;
 }
 
 /* ============================================
@@ -312,11 +354,16 @@ html, body {
 #preview-container {
   display: none;
   height: 100%;
+  min-width: 0;
   background: var(--bg-base);
   overflow-y: auto;
 }
 
-#preview-container.active { display: block; flex: 1; min-width: 0; }
+#preview-container.active {
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+}
 
 #preview-wrapper {
   position: relative;
@@ -576,8 +623,21 @@ body.preview-resizing #preview { user-select: none; }
   text-transform: uppercase;
 }
 
-#status-counts {
+#status-editor-stats {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  color: var(--text-dim);
+}
+
+#status-editor-stats > span {
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+#status-counts {
   color: var(--text-dim);
 }
 

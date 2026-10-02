@@ -1,3 +1,9 @@
+marked.setOptions({
+  gfm: true,
+  breaks: false,
+  pedantic: false
+});
+
 // IPC Bridge
 function sendToRust(command, data) {
   var msg = JSON.stringify(Object.assign({ command: command }, data || {}));
@@ -146,8 +152,17 @@ function selectInEditor(text, ratio) {
 function toggleMode() {
   if (splitMode) {
     splitMode = false;
+
     document.body.classList.remove('split-mode');
     document.getElementById('btn-split').classList.remove('active');
+
+    document
+      .getElementById('editor-container')
+      .classList.remove('active');
+
+    document
+      .getElementById('preview-container')
+      .classList.remove('active');
   }
 
   var iconPreview = document.getElementById('icon-preview');
@@ -434,10 +449,68 @@ document
 
 
 // Word count
+function updateEditorStatus() {
+  var editor = $.editor || document.getElementById('editor');
+  var text = editor.value;
+
+  var length = text.length;
+  var lines = text.split('\n').length;
+
+  var pos = editor.selectionStart || 0;
+  var beforeCaret = text.substring(0, pos);
+
+  var line = beforeCaret.split('\n').length;
+  var lastNewline = beforeCaret.lastIndexOf('\n');
+  var col = pos - lastNewline;
+
+  var words = text.trim()
+    ? text.trim().split(/\s+/).length
+    : 0;
+
+  document.getElementById('status-length').textContent =
+    'length: ' + length.toLocaleString();
+
+  document.getElementById('status-lines').textContent =
+    'lines: ' + lines.toLocaleString();
+
+  document.getElementById('status-cursor').textContent =
+    'Ln: ' + line +
+    '   Col: ' + col +
+    '   Pos: ' + pos.toLocaleString();
+
+  document.getElementById('status-counts').textContent =
+    words.toLocaleString() +
+    ' word' +
+    (words === 1 ? '' : 's');
+}
+
 function updateWordCount() {
-  var text = ($.editor || document.getElementById('editor')).value;
-  var words = text.trim() ? text.trim().split(/\s+/).length : 0;
-  document.getElementById('status-counts').textContent = words + ' word' + (words !== 1 ? 's' : '');
+  updateEditorStatus();
+}
+
+function updateLineNumbers() {
+  var editor = $.editor || document.getElementById('editor');
+  var gutter = document.getElementById('line-numbers');
+
+  if (!editor || !gutter) return;
+
+  var lineCount = editor.value.split('\n').length;
+  var numbers = [];
+
+  for (var i = 1; i <= lineCount; i++) {
+    numbers.push(i);
+  }
+
+  gutter.textContent = numbers.join('\n');
+}
+
+function syncLineNumberScroll() {
+  var editor = $.editor || document.getElementById('editor');
+  var gutter = document.getElementById('line-numbers');
+
+  if (!editor || !gutter) return;
+
+  gutter.scrollTop = editor.scrollTop;
 }
 
 // Recent Files
@@ -1209,6 +1282,18 @@ function setTheme(theme) {
 document.getElementById('btn-theme').addEventListener('click', function() {
   var current = document.documentElement.getAttribute('data-theme') || 'dark';
   setTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+var editorStatusElement =
+  $.editor || document.getElementById('editor');
+
+editorStatusElement.addEventListener('click', updateEditorStatus);
+editorStatusElement.addEventListener('keyup', updateEditorStatus);
+editorStatusElement.addEventListener('select', updateEditorStatus);
+
+editorStatusElement.addEventListener('scroll', function() {
+  syncLineNumberScroll();
+  updateEditorStatus();
 });
 
 // Init

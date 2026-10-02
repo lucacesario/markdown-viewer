@@ -3,6 +3,9 @@
 
   var changeTimer = null;
   editor.addEventListener('input', function() {
+    updateLineNumbers();
+    updateEditorStatus();
+
     var activeTab = TabManager.getActiveTab();
     if (activeTab) activeTab.parsedHtml = null;
     clearTimeout(changeTimer);
@@ -25,6 +28,7 @@
       var end = editor.selectionEnd;
       editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
       editor.selectionStart = editor.selectionEnd = start + 4;
+      updateEditorStatus();
       editor.dispatchEvent(new Event('input'));
       TabManager.markDirty();
       if (typeof splitMode !== 'undefined' && splitMode) updateSplitPreview();
