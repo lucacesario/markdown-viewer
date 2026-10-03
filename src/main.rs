@@ -7,7 +7,7 @@ use tao::{
     dpi::{LogicalPosition, LogicalSize},
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy},
-    window::WindowBuilder,
+    window::{Icon, WindowBuilder},
 };
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOZORDER};
@@ -21,6 +21,7 @@ mod window_state;
 const INDEX_HTML: &str = include_str!("frontend/index.html");
 const STYLE_CSS: &str = include_str!("frontend/style.css");
 const APP_JS: &str = include_str!("frontend/app.js");
+const GUIDE_MD: &str = include_str!("frontend/guide.md");
 const EDITOR_JS: &str = include_str!("frontend/editor.js");
 const PREVIEW_JS: &str = include_str!("frontend/preview.js");
 const TABS_JS: &str = include_str!("frontend/tabs.js");
@@ -30,6 +31,18 @@ const HLJS: &str = include_str!("frontend/highlight.min.js");
 #[derive(Debug)]
 enum UserEvent {
     IpcMessage(String),
+}
+
+fn load_window_icon() -> Option<Icon> {
+    let bytes = include_bytes!("../assets/icon.png");
+
+    let image = image::load_from_memory(bytes)
+        .ok()?
+        .into_rgba8();
+
+    let (width, height) = image.dimensions();
+
+    Icon::from_rgba(image.into_raw(), width, height).ok()
 }
 
 fn main() {
@@ -93,6 +106,7 @@ fn main() {
 
     let window = WindowBuilder::new()
         .with_title("Markdown Viewer - Untitled")
+        .with_window_icon(load_window_icon())
         .with_decorations(false)
         .with_inner_size(LogicalSize::new(
             size.0 as f64,
@@ -318,7 +332,11 @@ fn build_html() -> String {
         escape_for_script_tag(APP_JS),
     );
 
+    let guide_json =
+        serde_json::to_string(GUIDE_MD).unwrap_or_else(|_| "\"\"".to_string());
+
     INDEX_HTML
         .replace("/* __CSS__ */", STYLE_CSS)
+        .replace("\"__GUIDE_MD__\"", &guide_json)
         .replace("<!-- __SCRIPTS__ -->", &scripts)
 }

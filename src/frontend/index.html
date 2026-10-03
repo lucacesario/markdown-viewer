@@ -9,21 +9,44 @@
   <div id="titlebar">
     <div class="titlebar-actions">
       <button id="btn-new" title="New (Ctrl+N)">
-        <svg viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5.5L13 5v9.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.2"/><path d="M9 1.5V5h3.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 9h4M8 7v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 16 16" fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round">
+          <path d="M4 1.5h5.5L13 5v8.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z"/>
+          <path d="M9.5 1.5V5H13"/>
+          <path d="M6 9h4"/>
+          <path d="M8 7v4"/>
+        </svg>
       </button>
       <button id="btn-open" title="Open (Ctrl+O)">
         <svg viewBox="0 0 16 16" fill="none"><path d="M2 13V4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" stroke="currentColor" stroke-width="1.2"/></svg>
       </button>
       <button id="btn-save" title="Save (Ctrl+S)">
-        <svg viewBox="0 0 16 16" fill="none"><path d="M3 1.5h8.5L14 4v9.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.2"/><rect x="5" y="1.5" width="5" height="4" rx="0.5" stroke="currentColor" stroke-width="1.2"/><rect x="4.5" y="9" width="7" height="4.5" rx="0.5" stroke="currentColor" stroke-width="1.2"/></svg>
+        <svg viewBox="0 0 16 16" fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round">
+          <path d="M3 1.5h8l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z"/>
+          <path d="M5 1.5V5h5V1.5"/>
+          <rect x="4.5" y="9" width="7" height="4.5" rx="0.5"/>
+        </svg>
       </button>
       <button id="btn-print" title="Export PDF (Ctrl+P)">
-        <svg viewBox="0 0 16 16" fill="none">
-          <path d="M4 6V1.5h8V6" stroke="currentColor" stroke-width="1.2"/>
-          <rect x="2" y="6" width="12" height="6" rx="1.5"
-                stroke="currentColor" stroke-width="1.2"/>
-          <path d="M4 10h8v4.5H4z"
-                stroke="currentColor" stroke-width="1.2"/>
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M4 6V1.5h8V6"/>
+          <rect x="2" y="6" width="12" height="6" rx="1.5"/>
+          <path d="M4 10h8v4.5H4z"/>
         </svg>
       </button>
       <div class="titlebar-sep"></div>
@@ -36,6 +59,20 @@
       </button>
       <button id="btn-toc" title="Outline (Ctrl+Shift+O)">
         <svg viewBox="0 0 16 16" fill="none"><path d="M3 3h10M3 6.5h7M3 10h8M3 13.5h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+      <button id="btn-guide" title="Markdown Guide (Ctrl+G)">
+        <svg viewBox="0 0 16 16" fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true">
+          <circle cx="8" cy="8" r="6"/>
+          <path d="M6.5 6.2a1.7 1.7 0 1 1 2.7 1.4C8.4 8.2 8 8.6 8 9.5"/>
+          <circle cx="8" cy="11.7" r="0.55"
+                  fill="currentColor"
+                  stroke="none"/>
+        </svg>
       </button>
     </div>
     <span id="titlebar-title">Untitled</span>
@@ -85,7 +122,7 @@
 
         <textarea
           id="editor"
-          placeholder="Start writing markdown..."
+          placeholder="Start typing here…  Need help? Press the ? button in the status bar or Ctrl+G for the Markdown Guide"
           spellcheck="false"
         ></textarea>
       </div>
@@ -187,7 +224,33 @@
     </div>
   </div>
 </div>
+<div id="guide-modal" class="modal-backdrop">
+  <div class="guide-card">
+    <div class="guide-header">
+      <span>Markdown Guide</span>
 
+      <div class="guide-search">
+        <input
+          id="guide-search-input"
+          type="text"
+          placeholder="Search guide..."
+          spellcheck="false"
+        >
+        <span id="guide-search-count"></span>
+      </div>
+
+      <button id="guide-close" title="Close">
+        ×
+      </button>
+    </div>
+
+    <div id="guide-content"></div>
+  </div>
+</div>
+
+<script>
+  window.__MARKDOWN_GUIDE__ = "__GUIDE_MD__";
+</script>
   <!-- __SCRIPTS__ -->
 </body>
 </html>

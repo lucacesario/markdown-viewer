@@ -489,20 +489,178 @@ function updateWordCount() {
 }
 
 function updateLineNumbers() {
-  var editor = $.editor || document.getElementById('editor');
-  var gutter = document.getElementById('line-numbers');
+  var editor =
+    $.editor ||
+    document.getElementById('editor');
+
+  var gutter =
+    document.getElementById('line-numbers');
 
   if (!editor || !gutter) return;
 
-  var lineCount = editor.value.split('\n').length;
-  var numbers = [];
+  /*
+   * Logical lines only.
+   *
+   * This preserves empty lines and also preserves
+   * the final empty line when the document ends
+   * with a newline.
+   */
+  var lines = editor.value.split(/\r\n|\r|\n/);
 
-  for (var i = 1; i <= lineCount; i++) {
-    numbers.push(i);
+  /*
+   * Hidden mirror used only to determine how many
+   * visual rows a logical line occupies.
+   */
+  var mirror =
+    document.getElementById('line-measure-mirror');
+
+  if (!mirror) {
+    mirror = document.createElement('div');
+    mirror.id = 'line-measure-mirror';
+
+    mirror.style.position = 'absolute';
+    mirror.style.left = '-100000px';
+    mirror.style.top = '0';
+    mirror.style.visibility = 'hidden';
+    mirror.style.pointerEvents = 'none';
+
+    mirror.style.boxSizing = 'border-box';
+    mirror.style.margin = '0';
+    mirror.style.padding = '0';
+    mirror.style.border = '0';
+    
+    mirror.style.whiteSpace = 'pre-wrap';
+    mirror.style.overflowWrap = 'break-word';
+    mirror.style.wordBreak = 'normal';
+
+    document.body.appendChild(mirror);
   }
 
-  gutter.textContent = numbers.join('\n');
+  var style =
+    window.getComputedStyle(editor);
+
+  /*
+   * Copy the typography used by the textarea.
+   */
+  mirror.style.fontFamily =
+    style.fontFamily;
+
+  mirror.style.fontSize =
+    style.fontSize;
+
+  mirror.style.fontWeight =
+    style.fontWeight;
+
+  mirror.style.fontStyle =
+    style.fontStyle;
+
+  mirror.style.lineHeight =
+    style.lineHeight;
+
+  mirror.style.letterSpacing =
+    style.letterSpacing;
+
+  mirror.style.fontKerning =
+    style.fontKerning;
+
+  mirror.style.fontVariantLigatures =
+    style.fontVariantLigatures;
+
+  mirror.style.fontFeatureSettings =
+    style.fontFeatureSettings;
+
+  mirror.style.tabSize =
+    style.tabSize;
+
+  /*
+   * Measure against the usable text width,
+   * excluding textarea padding.
+   */
+  var paddingLeft =
+    parseFloat(style.paddingLeft) || 0;
+
+  var paddingRight =
+    parseFloat(style.paddingRight) || 0;
+
+  var contentWidth =
+    editor.clientWidth -
+    paddingLeft -
+    paddingRight;
+
+  mirror.style.width =
+    Math.max(1, contentWidth) + 'px';
+
+  var lineHeight =
+    parseFloat(style.lineHeight);
+
+  if (!lineHeight || isNaN(lineHeight)) {
+    lineHeight =
+      parseFloat(style.fontSize) * 1.8;
+  }
+
+  gutter.innerHTML = '';
+
+  lines.forEach(function(line, index) {
+    /*
+     * An empty logical line must still consume
+     * exactly one visual editor row.
+     *
+     * Zero-width space gives the mirror something
+     * measurable without changing the width.
+     */
+    mirror.textContent =
+      line === ''
+        ? '\u200b'
+        : line;
+
+    var measuredHeight =
+      mirror.getBoundingClientRect().height;
+
+    /*
+     * Convert the measured height into whole
+     * visual rows.
+     */
+    var visualRows =
+      Math.max(
+        1,
+        Math.round(
+          measuredHeight / lineHeight
+        )
+      );
+
+    var number =
+      document.createElement('div');
+
+    number.className =
+      'line-number';
+
+    number.textContent =
+      index + 1;
+
+    /*
+     * One logical number, but enough height to
+     * follow any visual wrapping in the textarea.
+     */
+    number.style.height =
+      (visualRows * lineHeight) + 'px';
+
+    number.style.lineHeight =
+      lineHeight + 'px';
+
+    gutter.appendChild(number);
+  });
+
+  syncLineNumberScroll();
 }
+
+var lineNumberResizeObserver =
+  new ResizeObserver(function() {
+    updateLineNumbers();
+  });
+
+lineNumberResizeObserver.observe(
+  document.getElementById('editor')
+);
 
 function syncLineNumberScroll() {
   var editor = $.editor || document.getElementById('editor');
@@ -531,33 +689,54 @@ function addRecentFile(path) {
 function showRecentPanel() {
   var panel = document.getElementById('recent-panel');
   var tab = TabManager.getActiveTab();
-  if (!tab || tab.path || tab.dirty || tab.content !== '') {
+
+  if (
+    !tab ||
+    tab.showRecent !== true ||
+    tab.path ||
+    tab.dirty ||
+    tab.content !== ''
+  ) {
     panel.classList.remove('visible');
     return;
   }
+
   var recent = getRecentFiles();
-  if (recent.length === 0) { panel.classList.remove('visible'); return; }
+
+  if (recent.length === 0) {
+    panel.classList.remove('visible');
+    return;
+  }
+
   panel.innerHTML = '';
+
   var title = document.createElement('div');
   title.className = 'recent-title';
   title.textContent = 'Recent Files';
   panel.appendChild(title);
+
   recent.forEach(function(r) {
     var item = document.createElement('div');
     item.className = 'recent-item';
+
     var name = document.createElement('span');
     name.className = 'recent-name';
     name.textContent = r.filename;
+
     var path = document.createElement('span');
     path.className = 'recent-path';
     path.textContent = r.path;
+
     item.appendChild(name);
     item.appendChild(path);
+
     item.addEventListener('click', function() {
       sendToRust('open_file', { path: r.path });
     });
+
     panel.appendChild(item);
   });
+
   panel.classList.add('visible');
 }
 
@@ -1156,115 +1335,527 @@ function bindPdfOptionsUi() {
   restorePdfOptions();
 }
 
+// Markdown Guide
+
+function openMarkdownGuide() {
+  var modal = document.getElementById('guide-modal');
+  var content = document.getElementById('guide-content');
+
+  if (!modal || !content) return;
+
+  content.innerHTML = marked.parse(
+    window.__MARKDOWN_GUIDE__ || ''
+  );
+
+  content.scrollTop = 0;
+  modal.classList.add('visible');
+
+  focusGuideSearch();
+}
+
+function closeMarkdownGuide() {
+  var modal = document.getElementById('guide-modal');
+
+  if (modal) {
+    modal.classList.remove('visible');
+  }
+}
+
+function isMarkdownGuideOpen() {
+  var modal = document.getElementById('guide-modal');
+
+  return !!(
+    modal &&
+    modal.classList.contains('visible')
+  );
+}
+
+function focusGuideSearch() {
+  var input = document.getElementById('guide-search-input');
+
+  if (!input) return;
+
+  setTimeout(function() {
+    input.focus();
+    input.select();
+  }, 0);
+}
+
+var guideSearchState = {
+  matches: [],
+  current: -1
+};
+
+function clearGuideSearch() {
+  var content = document.getElementById('guide-content');
+
+  var marks = content.querySelectorAll('mark.guide-match');
+
+  marks.forEach(function(mark) {
+    var parent = mark.parentNode;
+
+    while (mark.firstChild) {
+      parent.insertBefore(mark.firstChild, mark);
+    }
+
+    parent.removeChild(mark);
+    parent.normalize();
+  });
+
+  guideSearchState.matches = [];
+  guideSearchState.current = -1;
+
+  document.getElementById('guide-search-count').textContent = '';
+}
+
+function searchMarkdownGuide(term) {
+  clearGuideSearch();
+
+  if (!term) return;
+
+  var content = document.getElementById('guide-content');
+  var walker = document.createTreeWalker(
+    content,
+    NodeFilter.SHOW_TEXT
+  );
+
+  var ranges = [];
+  var node;
+  var needle = term.toLowerCase();
+
+  while ((node = walker.nextNode())) {
+    if (
+      node.parentElement &&
+      node.parentElement.closest('mark.guide-match')
+    ) {
+      continue;
+    }
+
+    var text = node.textContent;
+    var lower = text.toLowerCase();
+    var index = 0;
+
+    while ((index = lower.indexOf(needle, index)) !== -1) {
+      var range = document.createRange();
+
+      range.setStart(node, index);
+      range.setEnd(node, index + term.length);
+
+      ranges.push(range);
+
+      index += term.length;
+    }
+  }
+
+  for (var i = ranges.length - 1; i >= 0; i--) {
+    var mark = document.createElement('mark');
+    mark.className = 'guide-match';
+
+    ranges[i].surroundContents(mark);
+  }
+
+  guideSearchState.matches =
+    Array.from(content.querySelectorAll('mark.guide-match'));
+
+  if (guideSearchState.matches.length > 0) {
+    guideSearchState.current = 0;
+    showGuideSearchMatch(0);
+  }
+
+  updateGuideSearchCount();
+}
+
+function showGuideSearchMatch(index) {
+  if (!guideSearchState.matches.length) return;
+
+  guideSearchState.matches.forEach(function(mark) {
+    mark.classList.remove('active');
+  });
+
+  guideSearchState.current = index;
+
+  var mark = guideSearchState.matches[index];
+  mark.classList.add('active');
+
+  mark.scrollIntoView({
+    block: 'center'
+  });
+
+  updateGuideSearchCount();
+}
+
+function updateGuideSearchCount() {
+  var count = document.getElementById('guide-search-count');
+
+  if (!guideSearchState.matches.length) {
+    count.textContent = '';
+    return;
+  }
+
+  count.textContent =
+    (guideSearchState.current + 1) +
+    '/' +
+    guideSearchState.matches.length;
+}
+
+function nextGuideSearchMatch() {
+  if (!guideSearchState.matches.length) return;
+
+  var next =
+    (guideSearchState.current + 1) %
+    guideSearchState.matches.length;
+
+  showGuideSearchMatch(next);
+}
+
+function prevGuideSearchMatch() {
+  if (!guideSearchState.matches.length) return;
+
+  var prev =
+    (guideSearchState.current - 1 +
+      guideSearchState.matches.length) %
+    guideSearchState.matches.length;
+
+  showGuideSearchMatch(prev);
+}
 // Keyboard Shortcuts
 document.addEventListener('keydown', function(e) {
-  if (e.ctrlKey && e.key === 'f') {
+  var key = e.key.toLowerCase();
+
+  // Ctrl+G = open Markdown Guide
+  // If already open, focus the Guide search box
+  if (e.ctrlKey && !e.shiftKey && key === 'g') {
+    e.preventDefault();
+
+    if (isMarkdownGuideOpen()) {
+      focusGuideSearch();
+    } else {
+      openMarkdownGuide();
+    }
+
+  // Ctrl+F while Guide is open = focus Guide search
+  } else if (
+    e.ctrlKey &&
+    !e.shiftKey &&
+    key === 'f' &&
+    isMarkdownGuideOpen()
+  ) {
+    e.preventDefault();
+    focusGuideSearch();
+
+  // Ctrl+F normally = main Find
+  } else if (
+    e.ctrlKey &&
+    !e.shiftKey &&
+    key === 'f'
+  ) {
     e.preventDefault();
     openFind();
-  } else if (e.key === 'Escape' && findState.open) {
+
+  // Escape closes Guide first
+  } else if (
+    e.key === 'Escape' &&
+    isMarkdownGuideOpen()
+  ) {
     e.preventDefault();
-    closeFind();
-  } else if (e.ctrlKey && e.key === 'o') {
-    e.preventDefault();
-    sendToRust('open_file');
-  } else if (e.ctrlKey && !e.shiftKey && e.key === 's') {
-    e.preventDefault();
-    doSave();
-  } else if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's')) {
-    e.preventDefault();
-    sendToRust('save_as', { content: document.getElementById('editor').value });
-  } else if (e.ctrlKey && e.key === 'e') {
-    e.preventDefault();
-    toggleMode();
-  } else if (e.ctrlKey && e.key === 'n') {
-    e.preventDefault();
-    TabManager.createTab(null, '');
-  } else if (e.ctrlKey && e.key === 'w') {
-    e.preventDefault();
-    var active = TabManager.getActiveTab();
-    if (active) TabManager.closeTab(active.id);
-  } else if (e.ctrlKey && !e.shiftKey && e.key === 'Tab') {
-    e.preventDefault();
-    TabManager.nextTab();
-  } else if (e.ctrlKey && e.shiftKey && e.key === 'Tab') {
-    e.preventDefault();
-    TabManager.prevTab();
-  } else if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
-    e.preventDefault();
-    applyZoom(zoomLevel + ZOOM_STEP);
-  } else if (e.ctrlKey && e.key === '-') {
-    e.preventDefault();
-    applyZoom(zoomLevel - ZOOM_STEP);
-  } else if (e.ctrlKey && e.key === '0') {
-    e.preventDefault();
-    applyZoom(1);
-  } else if (e.ctrlKey && e.key === '\\') {
-    e.preventDefault();
-    toggleSplit();
-  } else if (e.ctrlKey && e.shiftKey && (e.key === 'O' || e.key === 'o')) {
-    e.preventDefault();
-    toggleTOC();
-  } else if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'p') {
-    e.preventDefault();
-    openPdfOptions();
-  } else if (e.key === 'Escape' && isPdfOptionsOpen()) {
+    closeMarkdownGuide();
+
+  // Escape closes PDF options
+  } else if (
+    e.key === 'Escape' &&
+    isPdfOptionsOpen()
+  ) {
     e.preventDefault();
     closePdfOptions();
+
+  // Escape closes main Find
+  } else if (
+    e.key === 'Escape' &&
+    findState.open
+  ) {
+    e.preventDefault();
+    closeFind();
+
+  // Ctrl+O = Open
+  } else if (
+    e.ctrlKey &&
+    !e.shiftKey &&
+    key === 'o'
+  ) {
+    e.preventDefault();
+    sendToRust('open_file');
+
+  // Ctrl+Shift+S = Save As
+  } else if (
+    e.ctrlKey &&
+    e.shiftKey &&
+    key === 's'
+  ) {
+    e.preventDefault();
+
+    sendToRust('save_as', {
+      content: document.getElementById('editor').value
+    });
+
+  // Ctrl+S = Save
+  } else if (
+    e.ctrlKey &&
+    !e.shiftKey &&
+    key === 's'
+  ) {
+    e.preventDefault();
+    doSave();
+
+  // Ctrl+E = Toggle Preview
+  } else if (
+    e.ctrlKey &&
+    !e.shiftKey &&
+    key === 'e'
+  ) {
+    e.preventDefault();
+    toggleMode();
+
+  // Ctrl+N = New
+  } else if (
+    e.ctrlKey &&
+    !e.shiftKey &&
+    key === 'n'
+  ) {
+    e.preventDefault();
+
+    TabManager.createTab(
+      null,
+      '',
+      'edit',
+      'Untitled',
+      false
+    );
+
+  // Ctrl+W = Close active tab
+  } else if (
+    e.ctrlKey &&
+    !e.shiftKey &&
+    key === 'w'
+  ) {
+    e.preventDefault();
+
+    var active = TabManager.getActiveTab();
+
+    if (active) {
+      TabManager.closeTab(active.id);
+    }
+
+  // Ctrl+Tab = Next tab
+  } else if (
+    e.ctrlKey &&
+    !e.shiftKey &&
+    e.key === 'Tab'
+  ) {
+    e.preventDefault();
+    TabManager.nextTab();
+
+  // Ctrl+Shift+Tab = Previous tab
+  } else if (
+    e.ctrlKey &&
+    e.shiftKey &&
+    e.key === 'Tab'
+  ) {
+    e.preventDefault();
+    TabManager.prevTab();
+
+  // Ctrl++ = Zoom in
+  } else if (
+    e.ctrlKey &&
+    (e.key === '=' || e.key === '+')
+  ) {
+    e.preventDefault();
+    applyZoom(zoomLevel + ZOOM_STEP);
+
+  // Ctrl+- = Zoom out
+  } else if (
+    e.ctrlKey &&
+    e.key === '-'
+  ) {
+    e.preventDefault();
+    applyZoom(zoomLevel - ZOOM_STEP);
+
+  // Ctrl+0 = Reset zoom
+  } else if (
+    e.ctrlKey &&
+    e.key === '0'
+  ) {
+    e.preventDefault();
+    applyZoom(1);
+
+  // Ctrl+\ = Split View
+  } else if (
+    e.ctrlKey &&
+    e.key === '\\'
+  ) {
+    e.preventDefault();
+    toggleSplit();
+
+  // Ctrl+Shift+O = Outline
+  } else if (
+    e.ctrlKey &&
+    e.shiftKey &&
+    key === 'o'
+  ) {
+    e.preventDefault();
+    toggleTOC();
+
+  // Ctrl+P = PDF Export
+  } else if (
+    e.ctrlKey &&
+    !e.shiftKey &&
+    key === 'p'
+  ) {
+    e.preventDefault();
+    openPdfOptions();
   }
 });
 
 // Window Controls
-document.getElementById('btn-minimize').addEventListener('click', function() { sendToRust('window_minimize'); });
-document.getElementById('btn-maximize').addEventListener('click', function() { sendToRust('window_maximize'); });
-function openCloseConfirm() {
-  document
-    .getElementById('close-confirm-modal')
-    .classList.add('visible');
+
+document
+  .getElementById('btn-minimize')
+  .addEventListener('click', function() {
+    sendToRust('window_minimize');
+  });
+
+document
+  .getElementById('btn-maximize')
+  .addEventListener('click', function() {
+    sendToRust('window_maximize');
+  });
+
+
+// Shared confirmation modal
+
+var confirmAction = null;
+
+function openConfirmModal(message, onConfirm) {
+  var modal = document.getElementById('close-confirm-modal');
+  var messageEl = modal.querySelector('.modal-message');
+
+  if (messageEl) {
+    messageEl.textContent = message;
+  }
+
+  confirmAction = onConfirm || null;
+
+  modal.classList.add('visible');
 }
 
-function closeCloseConfirm() {
-  document
-    .getElementById('close-confirm-modal')
-    .classList.remove('visible');
+function closeConfirmModal() {
+  var modal = document.getElementById('close-confirm-modal');
+
+  modal.classList.remove('visible');
+  confirmAction = null;
 }
+
+
+// Main window close button
 
 document
   .getElementById('btn-close')
   .addEventListener('click', function() {
 
     if (TabManager.hasAnyDirty()) {
-      openCloseConfirm();
+      openConfirmModal(
+        'You have unsaved changes. Close anyway?',
+        function() {
+          sendToRust('window_close');
+        }
+      );
+
       return;
     }
 
     sendToRust('window_close');
   });
 
+
+// Confirmation modal buttons
+
 document
   .getElementById('close-cancel')
-  .addEventListener('click', closeCloseConfirm);
+  .addEventListener('click', closeConfirmModal);
 
 document
   .getElementById('close-confirm')
   .addEventListener('click', function() {
-    closeCloseConfirm();
-    sendToRust('window_close');
+    var action = confirmAction;
+
+    closeConfirmModal();
+
+    if (action) {
+      action();
+    }
   });
+
+
+// Clicking outside the dialog cancels it
 
 document
   .getElementById('close-confirm-modal')
   .addEventListener('click', function(e) {
     if (e.target === this) {
-      closeCloseConfirm();
+      closeConfirmModal();
     }
   });
+
 // Toolbar Buttons
-document.getElementById('btn-new').addEventListener('click', function() { TabManager.createTab(null, ''); });
+document.getElementById('btn-new').addEventListener('click', function() { TabManager.createTab(null, '', 'edit', 'Untitled', false); });
 document.getElementById('btn-open').addEventListener('click', function() { sendToRust('open_file'); });
 document.getElementById('btn-save').addEventListener('click', doSave);
 document.getElementById('btn-toggle').addEventListener('click', toggleMode);
 document.getElementById('btn-split').addEventListener('click', toggleSplit);
 document.getElementById('btn-toc').addEventListener('click', toggleTOC);
+var guideButton = document.getElementById('btn-guide');
+
+if (guideButton) {
+  guideButton.addEventListener('click', openMarkdownGuide);
+}
+
+var guideCloseButton = document.getElementById('guide-close');
+
+if (guideCloseButton) {
+  guideCloseButton.addEventListener('click', closeMarkdownGuide);
+}
+
+var guideModal = document.getElementById('guide-modal');
+
+if (guideModal) {
+  guideModal.addEventListener('click', function(e) {
+    if (e.target === guideModal) {
+      closeMarkdownGuide();
+    }
+  });
+}
+
+var guideSearchInput =
+  document.getElementById('guide-search-input');
+
+if (guideSearchInput) {
+  guideSearchInput.addEventListener('input', function() {
+    searchMarkdownGuide(this.value);
+  });
+
+  guideSearchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      nextGuideSearchMatch();
+    } else if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      prevGuideSearchMatch();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      this.value = '';
+      clearGuideSearch();
+    }
+  });
+}
 
 var printButton = document.getElementById('btn-print');
 if (printButton) {
@@ -1301,9 +1892,10 @@ document.addEventListener('DOMContentLoaded', function() {
   var saved = null;
   try { saved = localStorage.getItem('markdown-viewer-theme'); } catch(e) {}
   if (saved) setTheme(saved);
-  TabManager.createTab(null, '');
+  TabManager.createTab(null, '', 'edit', 'Untitled', true);
   updateWordCount();
   showRecentPanel();
   bindPdfOptionsUi();
   sendToRust('ready');
 });
+

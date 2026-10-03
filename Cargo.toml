@@ -4,6 +4,7 @@ version = "1.0.0"
 edition = "2021"
 
 [dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
 wry = "0.49"
 tao = "0.33"
 webview2-com = "0.35"

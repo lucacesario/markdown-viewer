@@ -7,7 +7,7 @@ var TabManager = (function() {
     return p.replace(/\\/g, '/');
   }
 
-  function createTab(path, content, forceMode, forceFilename) {
+  function createTab(path, content, forceMode, forceFilename, showRecent) {
     if (path) {
       var existing = findTabByPath(path);
       if (existing) {
@@ -34,6 +34,7 @@ var TabManager = (function() {
       id: id,
       path: path ? normalizePath(path) : null,
       filename: forceFilename || (path ? path.split(/[/\\]/).pop() : 'Untitled'),
+      showRecent: showRecent === true,
       content: content != null ? content : '',
       dirty: false,
       mode: forceMode || (path ? 'preview' : 'edit'),
@@ -47,18 +48,35 @@ var TabManager = (function() {
     return tab;
   }
 
-  function closeTab(id) {
-    var idx = tabs.findIndex(function(t) { return t.id === id; });
+  function closeTab(id, force) {
+    force = force === true;
+
+    var idx = tabs.findIndex(function(t) {
+      return t.id === id;
+    });
+
     if (idx === -1) return;
+
     var tab = tabs[idx];
-    if (tab.dirty) {
-      if (!confirm('Unsaved changes in "' + tab.filename + '". Close anyway?')) return;
+
+    if (tab.dirty && !force) {
+      openConfirmModal(
+        'Unsaved changes in "' + tab.filename + '". Close anyway?',
+        function() {
+          closeTab(id, true);
+        }
+      );
+
+      return;
     }
+
     tabs.splice(idx, 1);
+
     if (tabs.length === 0) {
       createTab(null, '');
       return;
     }
+
     if (activeTabId === id) {
       var newIdx = Math.min(idx, tabs.length - 1);
       switchTab(tabs[newIdx].id);
@@ -100,6 +118,12 @@ var TabManager = (function() {
   function restoreTabState(tab) {
     var editor = document.getElementById('editor');
     editor.value = tab.content;
+    if (typeof updateLineNumbers === 'function') {
+      updateLineNumbers();
+    }
+    if (typeof showRecentPanel === 'function') {
+      showRecentPanel();
+    }
 
     if (typeof splitMode !== 'undefined' && splitMode) {
       editor.scrollTop = tab.scrollTop;

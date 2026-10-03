@@ -15,12 +15,11 @@
   --danger: #c15050;
   --scrollbar: #2a2a30;
   --radius: 4px;
-  --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
-  --font-body: 'Segoe UI', -apple-system, sans-serif;
-  --font-reading: 'Georgia', 'Cambria', 'Times New Roman', serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', monospace;
+  --font-body: "Segoe UI", -apple-system, sans-serif;
+  --font-reading: "Georgia", "Cambria", "Times New Roman", serif;
   --zoom: 1;
 }
-
 /* Light theme — Catppuccin Latte inspired */
 [data-theme="light"] {
   --bg-base: #eff1f5;
@@ -39,10 +38,13 @@
   --danger: #d20f39;
   --scrollbar: #bcc0cc;
 }
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-html, body {
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html,
+body {
   height: 100%;
   background: var(--bg-base);
   color: var(--text);
@@ -50,11 +52,7 @@ html, body {
   overflow: hidden;
   user-select: none;
 }
-
-/* ============================================
-   UNIFIED TITLEBAR
-   One bar to rule them all: actions + title + chrome
-   ============================================ */
+/* ============================================ UNIFIED TITLEBAR One bar to rule them all: actions + title + chrome ============================================ */
 #titlebar {
   display: flex;
   align-items: center;
@@ -64,7 +62,6 @@ html, body {
   border-bottom: 1px solid var(--border);
   position: relative;
 }
-
 /* --- Action buttons (left) --- */
 .titlebar-actions {
   display: flex;
@@ -75,7 +72,6 @@ html, body {
   gap: 2px;
   flex-shrink: 0;
 }
-
 .titlebar-actions button {
   width: 30px;
   height: 26px;
@@ -90,33 +86,30 @@ html, body {
   transition: color 0.15s, background 0.15s;
   position: relative;
 }
-
 .titlebar-actions button svg {
+  display: block;
   width: 14px;
   height: 14px;
+  flex: 0 0 14px;
+  overflow: visible;
 }
-
 .titlebar-actions button:hover {
   color: var(--text);
   background: rgba(128, 128, 128, 0.1);
 }
-
 .titlebar-actions button:active {
   background: rgba(128, 128, 128, 0.06);
   transform: scale(0.95);
 }
-
 /* Preview toggle active state — warm glow */
 .titlebar-actions button.active {
   color: var(--accent);
   background: var(--accent-glow);
 }
-
 .titlebar-actions button.active:hover {
   color: var(--accent-hover);
   background: var(--accent-glow);
 }
-
 /* Separator dot between groups */
 .titlebar-sep {
   width: 3px;
@@ -126,7 +119,6 @@ html, body {
   margin: 0 6px;
   opacity: 0.5;
 }
-
 /* --- Filename (center) --- */
 #titlebar-title {
   flex: 1;
@@ -140,7 +132,6 @@ html, body {
   letter-spacing: 0.02em;
   font-weight: 400;
 }
-
 /* --- Window chrome (right) --- */
 #window-controls {
   display: flex;
@@ -148,7 +139,6 @@ html, body {
   -webkit-app-region: no-drag;
   flex-shrink: 0;
 }
-
 #window-controls button {
   width: 44px;
   height: 100%;
@@ -161,12 +151,10 @@ html, body {
   justify-content: center;
   transition: background 0.12s, color 0.12s;
 }
-
 #window-controls button:hover {
   background: rgba(128, 128, 128, 0.1);
   color: var(--text-secondary);
 }
-
 #window-controls button svg {
   width: 12px;
   height: 12px;
@@ -175,22 +163,17 @@ html, body {
   stroke-width: 1.3;
   stroke-linecap: round;
 }
-
 .window-controls-sep {
   width: 1px;
   height: 16px;
   background: var(--border);
   align-self: center;
 }
-
 #btn-close:hover {
   background: var(--danger) !important;
   color: #fff;
 }
-
-/* ============================================
-   TAB BAR
-   ============================================ */
+/* ============================================ TAB BAR ============================================ */
 #tab-bar {
   display: flex;
   align-items: center;
@@ -202,9 +185,9 @@ html, body {
   padding: 0 4px;
   gap: 2px;
 }
-
-#tab-bar::-webkit-scrollbar { height: 0; }
-
+#tab-bar::-webkit-scrollbar {
+  height: 0;
+}
 .tab {
   display: flex;
   align-items: center;
@@ -219,29 +202,24 @@ html, body {
   transition: color 0.12s, background 0.12s;
   flex-shrink: 0;
 }
-
 .tab:hover {
   color: var(--text-secondary);
   background: rgba(128, 128, 128, 0.08);
 }
-
 .tab.active {
   color: var(--text);
   background: var(--bg-raised);
 }
-
 .tab-label {
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .tab-dirty {
   color: var(--accent);
   font-size: 14px;
   line-height: 1;
 }
-
 .tab-close {
   font-size: 14px;
   line-height: 1;
@@ -251,27 +229,23 @@ html, body {
   color: var(--text-dim);
   border-radius: 3px;
 }
-
 .tab:hover .tab-close,
-.tab.active .tab-close { opacity: 0.6; }
-
-.tab-close:hover { opacity: 1 !important; color: var(--text); }
-
-/* ============================================
-   CONTENT AREA
-   ============================================ */
+.tab.active .tab-close {
+  opacity: 0.6;
+}
+.tab-close:hover {
+  opacity: 1 !important;
+  color: var(--text);
+}
+/* ============================================ CONTENT AREA ============================================ */
 #content {
   display: flex;
   height: calc(100% - 38px - 22px);
 }
-
 .has-tabs #content {
   height: calc(100% - 38px - 30px - 22px);
 }
-
-/* ============================================
-   EDITOR
-   ============================================ */
+/* ============================================ EDITOR ============================================ */
 #editor-container {
   display: none;
   position: relative;
@@ -279,13 +253,11 @@ html, body {
   min-width: 0;
   background: var(--bg-base);
 }
-
 #editor-container.active {
   display: flex;
   flex: 1 1 0;
   min-width: 0;
 }
-
 #editor-shell {
   display: flex;
   flex: 1 1 auto;
@@ -313,14 +285,16 @@ html, body {
   text-align: right;
   font-family: var(--font-mono);
   font-size: calc(10.5px * var(--zoom));
-  line-height: calc(24.3px * var(--zoom));
-  font-variant-numeric: tabular-nums;
 
-  white-space: pre;
   overflow: hidden;
 
   user-select: none;
   pointer-events: none;
+}
+
+.line-number {
+  box-sizing: border-box;
+  display: block;
 }
 
 #editor {
@@ -337,8 +311,13 @@ html, body {
   padding: 28px 32px;
 
   font-family: var(--font-mono);
-  font-size: calc(13.5px * var(--zoom));
+  font-size: calc(14px * var(--zoom));
   line-height: 1.8;
+
+  letter-spacing: 0;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
 
   resize: none;
   outline: none;
@@ -347,30 +326,26 @@ html, body {
 
   overflow: auto;
 }
-
-/* ============================================
-   PREVIEW — reading-optimized
-   ============================================ */
+/* ============================================ PREVIEW — reading-optimized ============================================ */
 #preview-container {
   display: none;
   height: 100%;
   min-width: 0;
   background: var(--bg-base);
-  overflow-y: auto;
-}
 
+  overflow-y: auto;
+  overflow-x: hidden;
+}
 #preview-container.active {
   display: block;
   flex: 1 1 0;
   min-width: 0;
 }
-
 #preview-wrapper {
   position: relative;
   max-width: 720px;
   margin: 0 auto;
 }
-
 #preview {
   padding: 36px 32px 60px;
   font-family: var(--font-reading);
@@ -378,22 +353,22 @@ html, body {
   line-height: 1.85;
   color: var(--text);
   user-select: text;
-}
 
+  overflow-wrap: break-word;
+  word-break: normal;
+}
 /* Split mode */
 body.split-mode #editor-container.active {
   border-right: 1px solid var(--border);
 }
-
 body.split-mode #preview-wrapper {
   max-width: none;
 }
-
 /* Preview resize handle */
 #preview-resize-handle {
   position: absolute;
   top: 0;
-  right: -3px;
+  right: 0;
   width: 6px;
   height: 100%;
   cursor: col-resize;
@@ -401,21 +376,28 @@ body.split-mode #preview-wrapper {
   transition: background 0.15s;
   z-index: 10;
 }
-
 #preview-resize-handle:hover,
 #preview-resize-handle.dragging {
   background: var(--accent);
   opacity: 0.4;
   border-radius: 3px;
 }
-
-body.preview-resizing { cursor: col-resize !important; }
-body.preview-resizing * { cursor: col-resize !important; }
-body.preview-resizing #preview { user-select: none; }
-
+body.preview-resizing {
+  cursor: col-resize !important;
+}
+body.preview-resizing * {
+  cursor: col-resize !important;
+}
+body.preview-resizing #preview {
+  user-select: none;
+}
 /* Headings — clean, slightly warm */
-#preview h1, #preview h2, #preview h3,
-#preview h4, #preview h5, #preview h6 {
+#preview h1,
+#preview h2,
+#preview h3,
+#preview h4,
+#preview h5,
+#preview h6 {
   font-family: var(--font-body);
   color: var(--text);
   margin-top: 2em;
@@ -424,32 +406,35 @@ body.preview-resizing #preview { user-select: none; }
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-
 #preview h1 {
   font-size: 1.9em;
   padding-bottom: 0.35em;
   border-bottom: 1px solid var(--border);
 }
-
 #preview h2 {
   font-size: 1.4em;
   padding-bottom: 0.25em;
   border-bottom: 1px solid var(--border-subtle);
 }
-
-#preview h3 { font-size: 1.15em; }
-#preview h4 { font-size: 1em; color: var(--text-secondary); }
-
-#preview p { margin: 0.9em 0; }
-
+#preview h3 {
+  font-size: 1.15em;
+}
+#preview h4 {
+  font-size: 1em;
+  color: var(--text-secondary);
+}
+#preview p {
+  margin: 0.9em 0;
+}
 #preview a {
   color: var(--link);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: border-color 0.15s;
 }
-#preview a:hover { border-bottom-color: var(--link); }
-
+#preview a:hover {
+  border-bottom-color: var(--link);
+}
 /* Inline code */
 #preview code {
   background: var(--bg-raised);
@@ -459,7 +444,6 @@ body.preview-resizing #preview { user-select: none; }
   font-size: 0.85em;
   color: var(--accent);
 }
-
 /* Code blocks */
 #preview pre {
   background: var(--bg-surface);
@@ -470,78 +454,156 @@ body.preview-resizing #preview { user-select: none; }
   margin: 1.2em 0;
   line-height: 1.65;
 }
-
 #preview pre code {
   background: none;
   padding: 0;
   color: var(--text);
   font-size: 0.82em;
 }
-
 /* Syntax highlighting — Catppuccin-inspired */
 #preview pre code .hljs-keyword,
-#preview pre code .hljs-selector-tag { color: #cba6f7; }
-#preview pre code .hljs-built_in { color: #f38ba8; }
+#preview pre code .hljs-selector-tag {
+  color: #cba6f7;
+}
+#preview pre code .hljs-built_in {
+  color: #f38ba8;
+}
 #preview pre code .hljs-type,
-#preview pre code .hljs-title.class_ { color: #f9e2af; }
+#preview pre code .hljs-title.class_ {
+  color: #f9e2af;
+}
 #preview pre code .hljs-title.function_,
-#preview pre code .hljs-title { color: #89b4fa; }
+#preview pre code .hljs-title {
+  color: #89b4fa;
+}
 #preview pre code .hljs-string,
-#preview pre code .hljs-addition { color: #a6e3a1; }
+#preview pre code .hljs-addition {
+  color: #a6e3a1;
+}
 #preview pre code .hljs-number,
-#preview pre code .hljs-literal { color: #fab387; }
+#preview pre code .hljs-literal {
+  color: #fab387;
+}
 #preview pre code .hljs-comment,
-#preview pre code .hljs-quote { color: #6c7086; font-style: italic; }
-#preview pre code .hljs-deletion { color: #f38ba8; }
+#preview pre code .hljs-quote {
+  color: #6c7086;
+  font-style: italic;
+}
+#preview pre code .hljs-deletion {
+  color: #f38ba8;
+}
 #preview pre code .hljs-attr,
-#preview pre code .hljs-attribute { color: #f9e2af; }
+#preview pre code .hljs-attribute {
+  color: #f9e2af;
+}
 #preview pre code .hljs-variable,
-#preview pre code .hljs-template-variable { color: #f5c2e7; }
-#preview pre code .hljs-regexp { color: #f5c2e7; }
+#preview pre code .hljs-template-variable {
+  color: #f5c2e7;
+}
+#preview pre code .hljs-regexp {
+  color: #f5c2e7;
+}
 #preview pre code .hljs-meta,
-#preview pre code .hljs-meta .hljs-keyword { color: #fab387; }
-#preview pre code .hljs-tag { color: #89b4fa; }
-#preview pre code .hljs-name { color: #cba6f7; }
+#preview pre code .hljs-meta .hljs-keyword {
+  color: #fab387;
+}
+#preview pre code .hljs-tag {
+  color: #89b4fa;
+}
+#preview pre code .hljs-name {
+  color: #cba6f7;
+}
 #preview pre code .hljs-selector-class,
-#preview pre code .hljs-selector-id { color: #89dceb; }
-#preview pre code .hljs-params { color: var(--text); }
-#preview pre code .hljs-punctuation { color: #9399b2; }
-#preview pre code .hljs-symbol { color: #f2cdcd; }
-#preview pre code .hljs-section { color: #89b4fa; font-weight: 600; }
-#preview pre code .hljs-emphasis { font-style: italic; }
-#preview pre code .hljs-strong { font-weight: 600; }
-
+#preview pre code .hljs-selector-id {
+  color: #89dceb;
+}
+#preview pre code .hljs-params {
+  color: var(--text);
+}
+#preview pre code .hljs-punctuation {
+  color: #9399b2;
+}
+#preview pre code .hljs-symbol {
+  color: #f2cdcd;
+}
+#preview pre code .hljs-section {
+  color: #89b4fa;
+  font-weight: 600;
+}
+#preview pre code .hljs-emphasis {
+  font-style: italic;
+}
+#preview pre code .hljs-strong {
+  font-weight: 600;
+}
 /* Syntax highlighting — light theme (Catppuccin Latte) */
 [data-theme="light"] #preview pre code .hljs-keyword,
-[data-theme="light"] #preview pre code .hljs-selector-tag { color: #8839ef; }
-[data-theme="light"] #preview pre code .hljs-built_in { color: #d20f39; }
+[data-theme="light"] #preview pre code .hljs-selector-tag {
+  color: #8839ef;
+}
+[data-theme="light"] #preview pre code .hljs-built_in {
+  color: #d20f39;
+}
 [data-theme="light"] #preview pre code .hljs-type,
-[data-theme="light"] #preview pre code .hljs-title.class_ { color: #df8e1d; }
+[data-theme="light"] #preview pre code .hljs-title.class_ {
+  color: #df8e1d;
+}
 [data-theme="light"] #preview pre code .hljs-title.function_,
-[data-theme="light"] #preview pre code .hljs-title { color: #1e66f5; }
+[data-theme="light"] #preview pre code .hljs-title {
+  color: #1e66f5;
+}
 [data-theme="light"] #preview pre code .hljs-string,
-[data-theme="light"] #preview pre code .hljs-addition { color: #40a02b; }
+[data-theme="light"] #preview pre code .hljs-addition {
+  color: #40a02b;
+}
 [data-theme="light"] #preview pre code .hljs-number,
-[data-theme="light"] #preview pre code .hljs-literal { color: #fe640b; }
+[data-theme="light"] #preview pre code .hljs-literal {
+  color: #fe640b;
+}
 [data-theme="light"] #preview pre code .hljs-comment,
-[data-theme="light"] #preview pre code .hljs-quote { color: #9ca0b0; }
-[data-theme="light"] #preview pre code .hljs-deletion { color: #d20f39; }
+[data-theme="light"] #preview pre code .hljs-quote {
+  color: #9ca0b0;
+}
+[data-theme="light"] #preview pre code .hljs-deletion {
+  color: #d20f39;
+}
 [data-theme="light"] #preview pre code .hljs-attr,
-[data-theme="light"] #preview pre code .hljs-attribute { color: #df8e1d; }
+[data-theme="light"] #preview pre code .hljs-attribute {
+  color: #df8e1d;
+}
 [data-theme="light"] #preview pre code .hljs-variable,
-[data-theme="light"] #preview pre code .hljs-template-variable { color: #ea76cb; }
-[data-theme="light"] #preview pre code .hljs-regexp { color: #ea76cb; }
+[data-theme="light"] #preview pre code .hljs-template-variable {
+  color: #ea76cb;
+}
+[data-theme="light"] #preview pre code .hljs-regexp {
+  color: #ea76cb;
+}
 [data-theme="light"] #preview pre code .hljs-meta,
-[data-theme="light"] #preview pre code .hljs-meta .hljs-keyword { color: #fe640b; }
-[data-theme="light"] #preview pre code .hljs-tag { color: #1e66f5; }
-[data-theme="light"] #preview pre code .hljs-name { color: #8839ef; }
+[data-theme="light"] #preview pre code .hljs-meta .hljs-keyword {
+  color: #fe640b;
+}
+[data-theme="light"] #preview pre code .hljs-tag {
+  color: #1e66f5;
+}
+[data-theme="light"] #preview pre code .hljs-name {
+  color: #8839ef;
+}
 [data-theme="light"] #preview pre code .hljs-selector-class,
-[data-theme="light"] #preview pre code .hljs-selector-id { color: #04a5e5; }
-[data-theme="light"] #preview pre code .hljs-params { color: var(--text); }
-[data-theme="light"] #preview pre code .hljs-punctuation { color: #6c6f85; }
-[data-theme="light"] #preview pre code .hljs-symbol { color: #dd7878; }
-[data-theme="light"] #preview pre code .hljs-section { color: #1e66f5; }
-
+[data-theme="light"] #preview pre code .hljs-selector-id {
+  color: #04a5e5;
+}
+[data-theme="light"] #preview pre code .hljs-params {
+  color: var(--text);
+}
+[data-theme="light"] #preview pre code .hljs-punctuation {
+  color: #6c6f85;
+}
+[data-theme="light"] #preview pre code .hljs-symbol {
+  color: #dd7878;
+}
+[data-theme="light"] #preview pre code .hljs-section {
+  color: #1e66f5;
+}
 /* Blockquotes */
 #preview blockquote {
   border-left: 2px solid var(--accent);
@@ -550,14 +612,12 @@ body.preview-resizing #preview { user-select: none; }
   color: var(--text-secondary);
   font-style: italic;
 }
-
 /* Images */
 #preview img {
   max-width: 100%;
   border-radius: 6px;
   margin: 0.5em 0;
 }
-
 /* Tables */
 #preview table {
   border-collapse: collapse;
@@ -566,13 +626,12 @@ body.preview-resizing #preview { user-select: none; }
   font-family: var(--font-body);
   font-size: 0.9em;
 }
-
-#preview th, #preview td {
+#preview th,
+#preview td {
   border: 1px solid var(--border);
   padding: 8px 14px;
   text-align: left;
 }
-
 #preview th {
   background: var(--bg-raised);
   font-weight: 600;
@@ -581,12 +640,18 @@ body.preview-resizing #preview { user-select: none; }
   font-size: 0.8em;
   letter-spacing: 0.04em;
 }
-
 /* Lists */
-#preview ul, #preview ol { padding-left: 1.8em; margin: 0.6em 0; }
-#preview li { margin: 0.3em 0; }
-#preview li::marker { color: var(--text-dim); }
-
+#preview ul,
+#preview ol {
+  padding-left: 1.8em;
+  margin: 0.6em 0;
+}
+#preview li {
+  margin: 0.3em 0;
+}
+#preview li::marker {
+  color: var(--text-dim);
+}
 /* Horizontal rule */
 #preview hr {
   border: none;
@@ -594,14 +659,15 @@ body.preview-resizing #preview { user-select: none; }
   background: linear-gradient(90deg, transparent, var(--border), transparent);
   margin: 2.5em 0;
 }
-
 /* Strong / em */
-#preview strong { color: var(--text); font-weight: 600; }
-#preview em { font-style: italic; }
-
-/* ============================================
-   STATUS BAR — barely there
-   ============================================ */
+#preview strong {
+  color: var(--text);
+  font-weight: 600;
+}
+#preview em {
+  font-style: italic;
+}
+/* ============================================ STATUS BAR — barely there ============================================ */
 #statusbar {
   height: 22px;
   display: flex;
@@ -614,7 +680,6 @@ body.preview-resizing #preview { user-select: none; }
   gap: 10px;
   font-family: var(--font-body);
 }
-
 #status-mode {
   color: var(--accent);
   font-weight: 600;
@@ -622,7 +687,6 @@ body.preview-resizing #preview { user-select: none; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-
 #status-editor-stats {
   margin-left: auto;
   display: flex;
@@ -630,24 +694,18 @@ body.preview-resizing #preview { user-select: none; }
   gap: 0;
   color: var(--text-dim);
 }
-
 #status-editor-stats > span {
   padding: 0 10px;
   border-left: 1px solid var(--border);
   white-space: nowrap;
 }
-
 #status-counts {
   color: var(--text-dim);
 }
-
 #status-info {
   color: var(--text-secondary);
 }
-
-/* ============================================
-   TABLE OF CONTENTS
-   ============================================ */
+/* ============================================ TABLE OF CONTENTS ============================================ */
 #toc-panel {
   width: 0;
   height: 100%;
@@ -657,19 +715,16 @@ body.preview-resizing #preview { user-select: none; }
   flex-shrink: 0;
   transition: width 0.2s ease, border-color 0.2s ease;
 }
-
 #toc-panel.open {
   width: 220px;
   border-right-color: var(--border);
   overflow-y: auto;
 }
-
 #toc-list {
   display: flex;
   flex-direction: column;
   width: 220px;
 }
-
 .toc-item {
   padding: 4px 12px;
   cursor: pointer;
@@ -682,33 +737,46 @@ body.preview-resizing #preview { user-select: none; }
   text-overflow: ellipsis;
   transition: color 0.1s, background 0.1s;
 }
-
 .toc-item:hover {
   color: var(--text);
   background: rgba(128, 128, 128, 0.08);
 }
-
 .toc-item.active {
   color: var(--accent);
 }
-
-.toc-h1 { padding-left: 12px; font-weight: 600; }
-.toc-h2 { padding-left: 24px; }
-.toc-h3 { padding-left: 36px; font-size: 11px; }
-.toc-h4 { padding-left: 48px; font-size: 11px; color: var(--text-dim); }
-.toc-h5 { padding-left: 56px; font-size: 10.5px; color: var(--text-dim); }
-.toc-h6 { padding-left: 64px; font-size: 10.5px; color: var(--text-dim); }
-
+.toc-h1 {
+  padding-left: 12px;
+  font-weight: 600;
+}
+.toc-h2 {
+  padding-left: 24px;
+}
+.toc-h3 {
+  padding-left: 36px;
+  font-size: 11px;
+}
+.toc-h4 {
+  padding-left: 48px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.toc-h5 {
+  padding-left: 56px;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+.toc-h6 {
+  padding-left: 64px;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
 .toc-empty {
   padding: 12px;
   color: var(--text-dim);
   font-size: 11px;
   font-style: italic;
 }
-
-/* ============================================
-   RECENT FILES
-   ============================================ */
+/* ============================================ RECENT FILES ============================================ */
 #recent-panel {
   display: none;
   position: absolute;
@@ -720,11 +788,9 @@ body.preview-resizing #preview { user-select: none; }
   gap: 4px;
   background: var(--bg-base);
 }
-
 #recent-panel.visible {
   display: flex;
 }
-
 .recent-title {
   font-size: 11px;
   font-weight: 600;
@@ -733,7 +799,6 @@ body.preview-resizing #preview { user-select: none; }
   text-transform: uppercase;
   margin-bottom: 8px;
 }
-
 .recent-item {
   display: flex;
   flex-direction: column;
@@ -745,16 +810,13 @@ body.preview-resizing #preview { user-select: none; }
   max-width: 80%;
   transition: background 0.1s;
 }
-
 .recent-item:hover {
   background: var(--bg-raised);
 }
-
 .recent-name {
   font-size: 12.5px;
   color: var(--text);
 }
-
 .recent-path {
   font-size: 10px;
   color: var(--text-dim);
@@ -762,10 +824,7 @@ body.preview-resizing #preview { user-select: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* ============================================
-   FIND BAR
-   ============================================ */
+/* ============================================ FIND BAR ============================================ */
 #find-bar {
   display: none;
   position: fixed;
@@ -780,11 +839,12 @@ body.preview-resizing #preview { user-select: none; }
   z-index: 100;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
-
-.has-tabs #find-bar { top: 74px; }
-
-#find-bar.open { display: flex; }
-
+.has-tabs #find-bar {
+  top: 74px;
+}
+#find-bar.open {
+  display: flex;
+}
 #find-input {
   width: 180px;
   height: 24px;
@@ -797,9 +857,9 @@ body.preview-resizing #preview { user-select: none; }
   font-size: 12px;
   outline: none;
 }
-
-#find-input:focus { border-color: var(--accent); }
-
+#find-input:focus {
+  border-color: var(--accent);
+}
 #find-count {
   font-size: 10.5px;
   color: var(--text-dim);
@@ -807,7 +867,6 @@ body.preview-resizing #preview { user-select: none; }
   text-align: center;
   white-space: nowrap;
 }
-
 #find-bar button {
   width: 24px;
   height: 24px;
@@ -820,12 +879,10 @@ body.preview-resizing #preview { user-select: none; }
   align-items: center;
   justify-content: center;
 }
-
 #find-bar button:hover {
   background: rgba(128, 128, 128, 0.1);
   color: var(--text);
 }
-
 #find-bar button svg {
   width: 10px;
   height: 10px;
@@ -834,31 +891,24 @@ body.preview-resizing #preview { user-select: none; }
   stroke-width: 1.3;
   stroke-linecap: round;
 }
-
 /* Find match highlights in preview */
 mark.find-match {
   background: rgba(224, 164, 122, 0.25);
   color: inherit;
   border-radius: 2px;
 }
-
 mark.find-match.find-active {
   background: var(--accent);
   color: var(--bg-base);
 }
-
 [data-theme="light"] mark.find-match {
   background: rgba(196, 114, 58, 0.2);
 }
-
 [data-theme="light"] mark.find-match.find-active {
   background: var(--accent);
   color: #fff;
 }
-
-/* ============================================
-   ZOOM TOAST
-   ============================================ */
+/* ============================================ ZOOM TOAST ============================================ */
 #zoom-toast {
   position: fixed;
   bottom: 48px;
@@ -878,15 +928,11 @@ mark.find-match.find-active {
   transition: opacity 0.15s, transform 0.15s;
   z-index: 900;
 }
-
 #zoom-toast.visible {
   opacity: 1;
   transform: translateX(-50%) scale(1);
 }
-
-/* ============================================
-   DROP OVERLAY
-   ============================================ */
+/* ============================================ DROP OVERLAY ============================================ */
 #drop-overlay {
   display: none;
   position: fixed;
@@ -898,9 +944,9 @@ mark.find-match.find-active {
   align-items: center;
   backdrop-filter: blur(8px);
 }
-
-#drop-overlay.visible { display: flex; }
-
+#drop-overlay.visible {
+  display: flex;
+}
 .drop-message {
   padding: 32px 48px;
   border: 1.5px dashed var(--text-dim);
@@ -909,44 +955,41 @@ mark.find-match.find-active {
   color: var(--text-secondary);
   letter-spacing: 0.02em;
 }
-
-/* ============================================
-   SCROLLBAR
-   ============================================ */
-::-webkit-scrollbar { width: 7px; }
-::-webkit-scrollbar-track { background: transparent; }
+/* ============================================ SCROLLBAR ============================================ */
+::-webkit-scrollbar {
+  width: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar);
   border-radius: 4px;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
-
-/* ============================================
-   ANIMATIONS
-   ============================================ */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
 }
-
-#editor-container.active { animation: fadeIn 0.12s ease; }
-#preview-container.active { animation: fadeIn 0.15s ease; }
-
-/* ============================================
-   PDF / PRINT
-   Everything related to PDF appearance lives here
-   ============================================ */
-
+/* ============================================ ANIMATIONS ============================================ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+#editor-container.active {
+  animation: fadeIn 0.12s ease;
+}
+#preview-container.active {
+  animation: fadeIn 0.15s ease;
+}
+/* ============================================ PDF / PRINT Everything related to PDF appearance lives here ============================================ */
 @media print {
-
-  /* ============================================
-     PDF CONFIG
-     ============================================ */
-
+  /* ============================================ PDF CONFIG ============================================ */
   @page {
     size: A4;
     margin: 16mm 16mm 18mm;
-
     @bottom-left {
       content: "";
       font-family: "Segoe UI", Arial, sans-serif;
@@ -954,7 +997,6 @@ mark.find-match.find-active {
       font-weight: 400;
       color: #7a8090;
     }
-
     @bottom-right {
       content: counter(page) " / " counter(pages);
       font-family: "Segoe UI", Arial, sans-serif;
@@ -963,68 +1005,45 @@ mark.find-match.find-active {
       color: #7a8090;
     }
   }
-
-  /* ============================================
-     PDF PALETTE / TYPOGRAPHY
-     ============================================ */
-
+  /* ============================================ PDF PALETTE / TYPOGRAPHY ============================================ */
   body.pdf-paper {
     --pdf-background: #ffffff;
-
     --pdf-text: #39496b;
     --pdf-heading: #36558f;
     --pdf-secondary: #69758f;
     --pdf-muted: #8a93a9;
-
     --pdf-surface: #f6f7fa;
     --pdf-raised: #eef1f5;
-
     --pdf-border: #d9deea;
     --pdf-border-subtle: #e7ebf2;
-
     --pdf-h1-rule: rgba(54, 85, 143, 0.14);
-    --pdf-h2-rule: rgba(54, 85, 143, 0.10);
-
+    --pdf-h2-rule: rgba(54, 85, 143, 0.1);
     --pdf-link: #3d63a6;
-
     --pdf-font-reading: Cambria, "Times New Roman", serif;
     --pdf-font-ui: "Segoe UI", Arial, sans-serif;
   }
-
   /* Black text mode */
   body.pdf-black {
     --pdf-text: #222222;
     --pdf-heading: #222222;
     --pdf-secondary: #555555;
     --pdf-muted: #777777;
-
     --pdf-h1-rule: rgba(0, 0, 0, 0.13);
     --pdf-h2-rule: rgba(0, 0, 0, 0.09);
-
     --pdf-link: #222222;
   }
-
-  /* ============================================
-     PAGE
-     ============================================ */
-
+  /* ============================================ PAGE ============================================ */
   html,
   body {
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
-
     background: var(--pdf-background, #ffffff) !important;
     color: var(--pdf-text, #39496b) !important;
-
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-
-  /* ============================================
-     HIDE APPLICATION UI
-     ============================================ */
-
+  /* ============================================ HIDE APPLICATION UI ============================================ */
   #titlebar,
   #tab-bar,
   #find-bar,
@@ -1036,58 +1055,40 @@ mark.find-match.find-active {
   #preview-resize-handle {
     display: none !important;
   }
-
-  /* ============================================
-     PRINT CONTENT
-     ============================================ */
-
+  /* ============================================ PRINT CONTENT ============================================ */
   #content,
   #preview-container {
     display: block !important;
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
-
     background: var(--pdf-background, #ffffff) !important;
   }
-
   #preview-wrapper {
     position: static !important;
-
     width: 100% !important;
     max-width: none !important;
-
     margin: 0 !important;
     padding: 0 !important;
   }
-
   #preview {
     width: 100% !important;
     max-width: none !important;
-
     margin: 0 !important;
     padding: 0 !important;
-
     font-family: var(
       --pdf-font-reading,
       Cambria,
       "Times New Roman",
       serif
     ) !important;
-
     font-size: 11.25pt !important;
     line-height: 1.75 !important;
-
     color: var(--pdf-text, #39496b) !important;
-
     font-synthesis: none !important;
     text-rendering: optimizeLegibility;
   }
-
-  /* ============================================
-     HEADINGS
-     ============================================ */
-
+  /* ============================================ HEADINGS ============================================ */
   #preview h1,
   #preview h2,
   #preview h3,
@@ -1095,211 +1096,163 @@ mark.find-match.find-active {
   #preview h5,
   #preview h6 {
     color: var(--pdf-heading, #36558f) !important;
-
     break-after: avoid-page;
     page-break-after: avoid;
-
     font-synthesis: none !important;
   }
-
   #preview h1 {
     padding-bottom: 0.22em !important;
-    border-bottom:
-      0.2px solid
-      var(--pdf-h1-rule, rgba(54, 85, 143, 0.14)) !important;
+    border-bottom: 0.2px solid var(--pdf-h1-rule, rgba(54, 85, 143, 0.14)) !important;
   }
-
   #preview h2 {
     padding-bottom: 0.12em !important;
-    border-bottom:
-      0.2px solid
-      var(--pdf-h2-rule, rgba(54, 85, 143, 0.10)) !important;
+    border-bottom: 0.2px solid var(--pdf-h2-rule, rgba(54, 85, 143, 0.1)) !important;
   }
-
-  /* ============================================
-     PARAGRAPHS / EMPHASIS
-     ============================================ */
-
+  /* ============================================ PARAGRAPHS / EMPHASIS ============================================ */
   #preview p {
     color: var(--pdf-text, #39496b) !important;
   }
-
   #preview strong {
     color: var(--pdf-text, #39496b) !important;
     font-weight: 600;
   }
-
   #preview em {
     color: var(--pdf-text, #39496b) !important;
   }
-
-  /* ============================================
-     LINKS
-     ============================================ */
-
+  /* ============================================ LINKS ============================================ */
   #preview a {
     color: var(--pdf-link, #3d63a6) !important;
     text-decoration: none !important;
     border-bottom: none !important;
   }
-
-  /* ============================================
-     CODE
-     ============================================ */
-
+  /* ============================================ CODE ============================================ */
   #preview code {
     background: var(--pdf-raised, #eef1f5) !important;
   }
-
   #preview pre {
     background: var(--pdf-surface, #f6f7fa) !important;
-
-    border:
-      0.5px solid
-      var(--pdf-border, #d9deea) !important;
-
+    border: 0.5px solid var(--pdf-border, #d9deea) !important;
     white-space: pre-wrap !important;
     word-break: break-word;
-
     overflow: visible !important;
-
     break-inside: avoid;
     page-break-inside: avoid;
   }
-
   #preview pre code {
     background: transparent !important;
   }
-
-  /* ============================================
-     BLOCKQUOTES
-     ============================================ */
-
+  /* ============================================ BLOCKQUOTES ============================================ */
   #preview blockquote {
     color: var(--pdf-secondary, #69758f) !important;
-
     break-inside: avoid;
     page-break-inside: avoid;
   }
-
-  /* ============================================
-     TABLES
-     ============================================ */
-
+  /* ============================================ TABLES ============================================ */
   #preview table {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-
   #preview th,
   #preview td {
-    border:
-      0.5px solid
-      var(--pdf-border, #d9deea) !important;
+    border: 0.5px solid var(--pdf-border, #d9deea) !important;
   }
-
   #preview th {
     background: var(--pdf-raised, #eef1f5) !important;
     color: var(--pdf-secondary, #69758f) !important;
   }
-
-  /* ============================================
-     IMAGES
-     ============================================ */
-
+  /* ============================================ IMAGES ============================================ */
   #preview img {
     max-width: 100% !important;
     height: auto !important;
-
     break-inside: avoid;
     page-break-inside: avoid;
   }
-
-  /* ============================================
-     LISTS
-     ============================================ */
-
+  /* ============================================ LISTS ============================================ */
   #preview li::marker {
     color: var(--pdf-muted, #8a93a9) !important;
   }
-
-  /* ============================================
-     HORIZONTAL RULE
-     ============================================ */
-
+  /* ============================================ HORIZONTAL RULE ============================================ */
   #preview hr {
     height: 0.5px !important;
     border: none !important;
-
-    background:
-      linear-gradient(
-        90deg,
-        transparent,
-        var(--pdf-border, #d9deea),
-        transparent
-      ) !important;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--pdf-border, #d9deea),
+      transparent
+    ) !important;
   }
 }
-
-/* ============================================
-   PDF EXPORT MODAL
-   ============================================ */
-
+/* ============================================ PDF EXPORT MODAL ============================================ */
 .modal-backdrop {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 2000;
-
   background: rgba(0, 0, 0, 0.42);
-
   align-items: center;
   justify-content: center;
 }
-
-.modal-backdrop.visible {
+.guide-card {
+  width: min(820px, calc(100vw - 80px));
+  height: min(760px, calc(100vh - 80px));
   display: flex;
-}
-
-.modal-card {
-  width: 340px;
-  max-width: calc(100vw - 40px);
-
-  background: var(--bg-surface);
-  color: var(--text);
-
+  flex-direction: column;
+  background: var(--bg-base);
   border: 1px solid var(--border);
-  border-radius: 10px;
-
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
-
-  padding: 18px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.25);
 }
-
-.modal-title {
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 16px;
-}
-
-.pdf-option-row {
+.guide-header {
+  flex: 0 0 42px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-
-  gap: 16px;
-
-  padding: 9px 0;
-
+  padding: 0 14px 0 18px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
   font-family: var(--font-body);
-  font-size: 12.5px;
-
+  font-size: 12px;
+  font-weight: 600;
+}
+#guide-close {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
   color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+#guide-close:hover {
+  background: rgba(128, 128, 128, 0.1);
+  color: var(--text);
+}
+#guide-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 38px 50px;
+  font-family: var(--font-reading);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  user-select: text;
+}
+.guide-search {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.pdf-option-row select {
-  min-width: 110px;
+#guide-search-input {
+  width: 220px;
+  height: 26px;
+  padding: 0 8px;
 
   background: var(--bg-base);
   color: var(--text);
@@ -1307,45 +1260,224 @@ mark.find-match.find-active {
   border: 1px solid var(--border);
   border-radius: 5px;
 
-  padding: 5px 8px;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+
+  outline: none;
 }
 
+#guide-search-input:focus {
+  border-color: var(--accent);
+}
+
+#guide-search-count {
+  min-width: 44px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  text-align: center;
+}
+
+#guide-content mark.guide-match {
+  background: rgba(224, 164, 122, 0.28);
+  color: inherit;
+  border-radius: 2px;
+}
+
+#guide-content mark.guide-match.active {
+  background: var(--accent);
+  color: var(--bg-base);
+}
+/* Markdown Guide content */
+#guide-content h1,
+#guide-content h2,
+#guide-content h3,
+#guide-content h4,
+#guide-content h5,
+#guide-content h6 {
+  font-family: var(--font-body);
+  color: var(--text);
+  margin-top: 2em;
+  margin-bottom: 0.6em;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+#guide-content h1:first-child {
+  margin-top: 0;
+}
+#guide-content h1 {
+  font-size: 1.9em;
+  padding-bottom: 0.35em;
+  border-bottom: 1px solid var(--border);
+}
+#guide-content h2 {
+  font-size: 1.4em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border-subtle);
+}
+#guide-content h3 {
+  font-size: 1.15em;
+}
+#guide-content h4 {
+  font-size: 1em;
+  color: var(--text-secondary);
+}
+#guide-content p {
+  margin: 0.9em 0;
+}
+#guide-content a {
+  color: var(--link);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+#guide-content a:hover {
+  border-bottom-color: var(--link);
+}
+#guide-content code {
+  background: var(--bg-raised);
+  padding: 1.5px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--accent);
+}
+#guide-content pre {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 18px 20px;
+  overflow-x: auto;
+  margin: 1.2em 0;
+  line-height: 1.65;
+}
+#guide-content pre code {
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font-size: 0.82em;
+}
+#guide-content blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 18px;
+  margin: 1.2em 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+#guide-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.5em 0;
+}
+#guide-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.2em 0;
+  font-family: var(--font-body);
+  font-size: 0.9em;
+}
+#guide-content th,
+#guide-content td {
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  text-align: left;
+}
+#guide-content th {
+  background: var(--bg-raised);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: 0.8em;
+  letter-spacing: 0.04em;
+}
+#guide-content ul,
+#guide-content ol {
+  padding-left: 1.8em;
+  margin: 0.6em 0;
+}
+#guide-content li {
+  margin: 0.3em 0;
+}
+#guide-content li::marker {
+  color: var(--text-dim);
+}
+#guide-content hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  margin: 2.5em 0;
+}
+#guide-content strong {
+  color: var(--text);
+  font-weight: 600;
+}
+#guide-content em {
+  font-style: italic;
+}
+.modal-backdrop.visible {
+  display: flex;
+}
+.modal-card {
+  width: 340px;
+  max-width: calc(100vw - 40px);
+  background: var(--bg-surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  padding: 18px;
+}
+.modal-title {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.pdf-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.pdf-option-row select {
+  min-width: 110px;
+  background: var(--bg-base);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 8px;
+}
 .pdf-option-row input[type="checkbox"] {
   width: 16px;
   height: 16px;
 }
-
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-
   margin-top: 18px;
 }
-
 .modal-actions button {
   min-width: 72px;
-
   border: 1px solid var(--border);
   border-radius: 6px;
-
   background: var(--bg-raised);
   color: var(--text);
-
   padding: 7px 12px;
-
   cursor: pointer;
 }
-
 .modal-actions button:hover {
   background: var(--bg-overlay);
 }
-
 .modal-actions button.primary {
   color: var(--accent-hover);
   border-color: var(--accent);
 }
-
 .modal-message {
   font-family: var(--font-body);
   font-size: 13px;

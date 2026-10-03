@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 24 24"
+   width="240"
+   height="240"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="icon.svg"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   inkscape:export-filename="icon.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.8582443"
+     inkscape:cx="73.456434"
+     inkscape:cy="138.03352"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g2" />
+  <!-- 
+    App: Markdown Viewer Icon
+    Style: Material Design, Single Color, No Background, Perfectly Aligned Grid
+    Color: #FFB300 (Material Amber)
+  -->
+  <g
+     id="g2"
+     transform="matrix(1.1044205,0,0,1.1044205,-1.8052569,-0.70083633)">
+    <path
+       fill="#ffb300"
+       d="m 2.1927864,3.3627261 c 0,-1.1984251 0.9715146,-2.1699397 2.1699397,-2.1699397 H 15.212425 c 0.575468,0 1.127392,0.228614 1.534364,0.6355645 l 5.424849,5.4248493 c 0.406972,0.4069396 0.635576,0.9588746 0.635576,1.5343752 V 19.637274 c 0,1.198458 -0.971482,2.16994 -2.16994,2.16994 H 4.3627261 c -1.1984251,0 -2.1699397,-0.971482 -2.1699397,-2.16994 z m 2.6039277,0.433988 V 19.203286 H 20.203286 V 9.6709687 L 14.329042,3.7967141 Z"
+       id="path1"
+       sodipodi:nodetypes="sssccsssssscccccc"
+       style="stroke-width:1.08497" />
+    <g
+       id="g1"
+       transform="matrix(1.0849698,0,0,1.0849698,-1.0621231,-0.97715325)">
+      <path
+         fill="#ffb300"
+         d="M 6.8844501,15.205642 V 17.31202 H 8.9908283 L 15.20324,11.099609 13.096862,8.9932297 Z M 16.832172,9.4706757 c 0.219063,-0.219063 0.219063,-0.572935 0,-0.791998 l -1.31438,-1.31438 c -0.219063,-0.219063 -0.572935,-0.219063 -0.791998,0 l -1.027912,1.027912 2.106378,2.1063793 z"
+         id="path1-4"
+         style="stroke-width:0.561701" />
+    </g>
+  </g>
+</svg>
