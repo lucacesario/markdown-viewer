@@ -21,6 +21,7 @@ window.__fromRust = function(event, data) {
       TabManager.markClean();
       if (data.path) {
         TabManager.updateTabPath(null, data.path);
+        addRecentFile(data.path);
       }
       onFileSaved();
       break;
@@ -714,6 +715,33 @@ function showRecentPanel() {
   title.className = 'recent-title';
   title.textContent = 'Recent Files';
   panel.appendChild(title);
+
+  
+  // Button to clear the recent files history
+  var clearButton = document.createElement('button');
+  clearButton.type = 'button';
+  clearButton.className = 'recent-clear-button';
+  clearButton.textContent = 'Clear Recent Files';
+
+  clearButton.addEventListener('click', function() {
+    openConfirmModal(
+      'Are you sure you want to clear your recent files? Your actual files will not be deleted.',
+      function() {
+        try {
+          localStorage.removeItem('markdown-viewer-recent');
+          showRecentPanel();
+        } catch (e) {
+          showError('Unable to clear recent files.');
+        }
+      },
+      'Clear Recent Files',
+      'Clear'
+    );
+  });
+
+
+  panel.appendChild(clearButton);
+
 
   recent.forEach(function(r) {
     var item = document.createElement('div');
@@ -1734,18 +1762,30 @@ document
 
 var confirmAction = null;
 
-function openConfirmModal(message, onConfirm) {
+
+function openConfirmModal(message, onConfirm, title, buttonText) {
   var modal = document.getElementById('close-confirm-modal');
   var messageEl = modal.querySelector('.modal-message');
+  var titleEl = modal.querySelector('.modal-title');
+  var confirmButton = document.getElementById('close-confirm');
 
   if (messageEl) {
     messageEl.textContent = message;
+  }
+
+  if (titleEl) {
+    titleEl.textContent = title || 'Unsaved changes';
+  }
+
+  if (confirmButton) {
+    confirmButton.textContent = buttonText || 'Close';
   }
 
   confirmAction = onConfirm || null;
 
   modal.classList.add('visible');
 }
+
 
 function closeConfirmModal() {
   var modal = document.getElementById('close-confirm-modal');

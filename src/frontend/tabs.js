@@ -17,8 +17,33 @@ var TabManager = (function() {
     }
 
     var active = getActiveTab();
+
+    
+    // The Recent Files screen is only a startup placeholder.
+    // Clicking New should replace it, not create another tab.
+    if (
+      !path &&
+      active &&
+      active.showRecent &&
+      !active.path &&
+      !active.dirty &&
+      active.content === ''
+    ) {
+      active.showRecent = false;
+      active.filename = forceFilename || 'Untitled';
+      active.mode = forceMode || 'edit';
+      active.parsedHtml = null;
+
+      restoreTabState(active);
+      renderTabBar();
+      updateWindowTitle();
+
+      return active;
+    }
+
     if (active && !active.path && !active.dirty && active.content === '' && path) {
       active.path = normalizePath(path);
+      active.showRecent = false;
       active.filename = path.split(/[/\\]/).pop();
       active.content = content != null ? content : '';
       active.dirty = false;

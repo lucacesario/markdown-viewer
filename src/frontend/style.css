@@ -799,6 +799,31 @@ body.preview-resizing #preview {
   text-transform: uppercase;
   margin-bottom: 8px;
 }
+
+/* Clear Recent Files button */
+.recent-clear-button {
+  margin-bottom: 14px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.recent-clear-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.recent-clear-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 .recent-item {
   display: flex;
   flex-direction: column;
