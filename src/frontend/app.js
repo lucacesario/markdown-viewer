@@ -1231,6 +1231,97 @@ document.getElementById('find-close').addEventListener('click', closeFind);
 document.getElementById('find-next').addEventListener('click', findNext);
 document.getElementById('find-prev').addEventListener('click', findPrev);
 
+/* Image Lightbox */
+(function() {
+  var modal = document.getElementById('image-lightbox');
+  var image = document.getElementById('lightbox-image');
+  var title = document.getElementById('lightbox-title');
+  var zoomLabel = document.getElementById('lightbox-zoom-label');
+  var zoom = 1;
+  var previousFocus = null;
+
+  function setZoom(value) {
+    zoom = Math.max(0.5, Math.min(4, value));
+    image.style.transform = 'scale(' + zoom + ')';
+    zoomLabel.textContent = Math.round(zoom * 100) + '%';
+  }
+
+  function openLightbox(sourceImage) {
+    if (!sourceImage.complete || !sourceImage.naturalWidth) return;
+
+    var src = sourceImage.currentSrc || sourceImage.src;
+    if (!src) return;
+
+    previousFocus = document.activeElement;
+
+    image.src = src;
+    image.alt = sourceImage.alt || '';
+    title.textContent = sourceImage.alt || 'Image preview';
+
+    setZoom(1);
+    modal.classList.add('visible');
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('lightbox-close').focus();
+  }
+
+  function closeLightbox() {
+    modal.classList.remove('visible');
+    modal.setAttribute('aria-hidden', 'true');
+    image.removeAttribute('src');
+    setZoom(1);
+
+    if (previousFocus && previousFocus.isConnected) {
+      previousFocus.focus();
+    }
+    previousFocus = null;
+  }
+
+  // Delegation works even when Markdown previews are rebuilt.
+  document.addEventListener('click', function(event) {
+    if (!event.target || !event.target.closest) return;
+
+    var clickedImage = event.target.closest(
+      '#preview img, #guide-content img'
+    );
+
+    if (clickedImage) {
+      event.preventDefault();
+      openLightbox(clickedImage);
+    }
+  });
+
+  document.getElementById('lightbox-close')
+    .addEventListener('click', closeLightbox);
+
+  document.getElementById('lightbox-zoom-in')
+    .addEventListener('click', function() {
+      setZoom(zoom + 0.25);
+    });
+
+  document.getElementById('lightbox-zoom-out')
+    .addEventListener('click', function() {
+      setZoom(zoom - 0.25);
+    });
+
+  document.getElementById('lightbox-reset')
+    .addEventListener('click', function() {
+      setZoom(1);
+    });
+
+  modal.addEventListener('click', function(event) {
+    if (event.target === modal) closeLightbox();
+  });
+
+  document.addEventListener('keydown', function(event) {
+    if (!modal.classList.contains('visible')) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeLightbox();
+    }
+  }, true);
+})();
 
 // PDF Export
 var pdfExportInProgress = false;

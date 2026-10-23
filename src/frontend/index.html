@@ -248,6 +248,30 @@
   </div>
 </div>
 
+<!-- Image Lightbox -->
+<div id="image-lightbox" class="modal-backdrop" role="dialog"
+     aria-modal="true" aria-label="Image preview"
+     aria-hidden="true">
+
+  <div class="lightbox-panel">
+    <div class="lightbox-toolbar">
+      <span id="lightbox-title">Image preview</span>
+
+      <div class="lightbox-actions">
+        <button id="lightbox-zoom-out" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+        <span id="lightbox-zoom-label">100%</span>
+        <button id="lightbox-zoom-in" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+        <button id="lightbox-reset" type="button" title="Reset zoom">Reset</button>
+        <button id="lightbox-close" type="button" title="Close" aria-label="Close">×</button>
+      </div>
+    </div>
+
+    <div id="lightbox-viewport" class="lightbox-viewport">
+      <img id="lightbox-image" alt="">
+    </div>
+  </div>
+</div>
+
 <script>
   window.__MARKDOWN_GUIDE__ = "__GUIDE_MD__";
 </script>
