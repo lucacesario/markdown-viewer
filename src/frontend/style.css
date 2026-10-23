@@ -1729,3 +1729,48 @@ mark.find-match.find-active {
     display: none !important;
   }
 }
+
+
+/* Reading time and progress in status bar */
+
+.reading-status {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 12px;
+  font-size: 11px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.reading-progress-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 12px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.reading-progress-text {
+  min-width: 30px;
+  text-align: right;
+}
+
+.reading-progress-track {
+  display: inline-block;
+  width: 56px;
+  height: 4px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(128, 128, 128, 0.25);
+}
+
+.reading-progress-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent, #7187bd);
+  transition: width 0.12s ease;
+}

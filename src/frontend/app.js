@@ -262,6 +262,8 @@ function toggleMode() {
     }
     if (findState.open) doFind(($.findInput || document.getElementById('find-input')).value);
   }
+
+  requestAnimationFrame(updateReadingIndicators);
 }
 
 function setTitle(title) {
@@ -322,6 +324,8 @@ function toggleSplit() {
     iconEdit.style.display = 'none';
     document.getElementById('editor').focus();
   }
+
+  requestAnimationFrame(updateReadingIndicators);
 }
 
 var splitPreviewTimer = null;
@@ -383,6 +387,8 @@ function updateSplitPreview() {
           previewContainer,
           scrollRatio
         );
+
+        updateReadingIndicators();
       });
 
     }, 150);
@@ -493,6 +499,85 @@ document
     syncPreviewToEditor
   );
 
+document.getElementById('preview-container')
+  .addEventListener('scroll', updateReadingIndicators);
+
+/* Reading time and progress */
+
+var READING_WORDS_PER_MINUTE = 225;
+
+function updateReadingIndicators() {
+  var editor = document.getElementById('editor');
+  var wordCount = document.getElementById('status-counts');
+  var previewContainer = document.getElementById('preview-container');
+
+  if (!editor || !wordCount || !previewContainer) return;
+
+  var readingInfo = document.getElementById('status-reading');
+
+  // Create the status bar elements once.
+  if (!readingInfo) {
+    readingInfo = document.createElement('span');
+    readingInfo.id = 'status-reading';
+    readingInfo.className = 'reading-status';
+    wordCount.insertAdjacentElement('afterend', readingInfo);
+  }
+
+  var progressInfo = document.getElementById('status-reading-progress');
+
+  if (!progressInfo) {
+    progressInfo = document.createElement('span');
+    progressInfo.id = 'status-reading-progress';
+    progressInfo.className = 'reading-progress-status';
+
+    var progressText = document.createElement('span');
+    progressText.className = 'reading-progress-text';
+
+    var track = document.createElement('span');
+    track.className = 'reading-progress-track';
+
+    var fill = document.createElement('span');
+    fill.className = 'reading-progress-fill';
+    track.appendChild(fill);
+
+    progressInfo.appendChild(progressText);
+    progressInfo.appendChild(track);
+
+    readingInfo.insertAdjacentElement('afterend', progressInfo);
+  }
+
+  // Count words using the same simple method as the status bar.
+  var text = editor.value.trim();
+  var words = text ? text.split(/\s+/).length : 0;
+
+  var minutes = words === 0
+    ? 0
+    : Math.max(1, Math.ceil(words / READING_WORDS_PER_MINUTE));
+
+  readingInfo.textContent = minutes + ' min read';
+
+  // Reading progress is only meaningful with a visible preview.
+  var previewVisible = splitMode || currentMode === 'preview';
+
+  progressInfo.style.display = previewVisible ? 'inline-flex' : 'none';
+
+  if (!previewVisible) return;
+
+  var maxScroll =
+    previewContainer.scrollHeight - previewContainer.clientHeight;
+
+  var percentage = maxScroll <= 0
+    ? 100
+    : Math.round((previewContainer.scrollTop / maxScroll) * 100);
+
+  percentage = Math.max(0, Math.min(100, percentage));
+
+  progressInfo.querySelector('.reading-progress-text').textContent =
+    percentage + '%';
+
+  progressInfo.querySelector('.reading-progress-fill').style.width =
+    percentage + '%';
+}
 
 // Word count
 function updateEditorStatus() {
@@ -528,6 +613,8 @@ function updateEditorStatus() {
     words.toLocaleString() +
     ' word' +
     (words === 1 ? '' : 's');
+
+  updateReadingIndicators();
 }
 
 function updateWordCount() {
@@ -703,10 +790,6 @@ var lineNumberResizeObserver =
   new ResizeObserver(function() {
     updateLineNumbers();
   });
-
-lineNumberResizeObserver.observe(
-  document.getElementById('editor')
-);
 
 lineNumberResizeObserver.observe(
   document.getElementById('editor')
