@@ -12,10 +12,17 @@ renderer.code = function(token) {
   var lang = (token.lang || '').trim();
   var code = token.text;
   var highlighted;
-  if (lang && hljs.getLanguage(lang)) {
+  
+  var plainTextLanguages = ['text', 'txt', 'plaintext', 'plain'];
+
+  if (!lang || plainTextLanguages.includes(lang.toLowerCase())) {
+    // Plain text must not be syntax-highlighted.
+    highlighted = escapeHtmlText(code);
+  } else if (hljs.getLanguage(lang)) {
     highlighted = hljs.highlight(code, { language: lang }).value;
   } else {
-    highlighted = hljs.highlightAuto(code).value;
+    // Unknown languages are displayed as plain text.
+    highlighted = escapeHtmlText(code);
   }
   var cls = lang ? ' class="language-' + escapeHtmlText(lang) + '"' : '';
   var language = '';
@@ -23,31 +30,69 @@ renderer.code = function(token) {
     language = String(token.lang).trim();
   }
 
-  var languageLabel = language ? escapeHtmlText(language.toUpperCase()) : 'CODE';
+  
+var languageNames = {
+  js: 'JavaScript',
+  javascript: 'JavaScript',
+  ts: 'TypeScript',
+  typescript: 'TypeScript',
+  py: 'Python',
+  python: 'Python',
+  rs: 'Rust',
+  rust: 'Rust',
+  json: 'JSON',
+  html: 'HTML',
+  css: 'CSS',
+  bash: 'Bash',
+  sh: 'Shell',
+  ps1: 'PowerShell',
+  powershell: 'PowerShell',
+  sql: 'SQL',
+  yaml: 'YAML',
+  yml: 'YAML',
+  xml: 'XML',
+  md: 'Markdown',
+  markdown: 'Markdown',
+  cpp: 'C++',
+  csharp: 'C#',
+  cs: 'C#',
+  plaintext: 'Plain Text',
+  text: 'Plain Text',
+  txt: 'Plain Text'
+};
 
-  var copyIcon =
-    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-      '<rect x="9" y="9" width="11" height="11" rx="2" ry="2"></rect>' +
-      '<rect x="4" y="4" width="11" height="11" rx="2" ry="2"></rect>' +
-    '</svg>';
+var languageKey = language.split(/\s+/)[0].toLowerCase();
 
-  var checkIcon =
-    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-      '<path d="M20 6L9 17l-5-5"></path>' +
-    '</svg>';
+var languageLabel = languageKey
+  ? (languageNames[languageKey] ||
+     languageKey.charAt(0).toUpperCase() + languageKey.slice(1))
+  : '';
 
-  return (
-    '<pre class="code-block-with-copy">' +
-      '<div class="code-block-toolbar">' +
-        '<div class="code-block-language">' + languageLabel + '</div>' +
-        '<button type="button" class="code-copy-button" aria-label="Copy code to clipboard" title="Copy code">' +
-          '<span class="code-copy-icon">' + copyIcon + '</span>' +
-          '<span class="code-check-icon">' + checkIcon + '</span>' +
-        '</button>' +
-      '</div>' +
-      '<code' + cls + '>' + highlighted + '</code>' +
-    '</pre>'
-  );
+languageLabel = escapeHtmlText(languageLabel);
+
+var copyIcon =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<rect x="9" y="9" width="11" height="11" rx="2" ry="2"></rect>' +
+    '<rect x="4" y="4" width="11" height="11" rx="2" ry="2"></rect>' +
+  '</svg>';
+
+var checkIcon =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<path d="M20 6L9 17l-5-5"></path>' +
+  '</svg>';
+
+return (
+  '<pre class="code-block-with-copy">' +
+    '<div class="code-block-toolbar">' +
+      '<div class="code-block-language">' + languageLabel + '</div>' +
+      '<button type="button" class="code-copy-button" aria-label="Copy code to clipboard" title="Copy code">' +
+        '<span class="code-copy-icon">' + copyIcon + '</span>' +
+        '<span class="code-check-icon">' + checkIcon + '</span>' +
+      '</button>' +
+    '</div>' +
+    '<code' + cls + '>' + highlighted + '</code>' +
+  '</pre>'
+);
 };
 
 marked.setOptions({
@@ -55,6 +100,82 @@ marked.setOptions({
   gfm: true,
   renderer: renderer,
 });
+
+
+/*
+ * Convert Markdown into sanitized HTML.
+ * Do not allow unsafe HTML to reach the WebView.
+ */
+function renderMarkdownSafe(markdown) {
+  if (typeof DOMPurify === 'undefined') {
+    throw new Error('DOMPurify failed to load');
+  }
+
+  var html = marked.parse(markdown || '');
+
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ALLOW_DATA_ATTR: false
+  });
+}
+
+
+function restoreCodeCopyIcons(root) {
+  if (!root) return;
+
+  var buttons = root.querySelectorAll('.code-copy-button');
+
+  function createIcon(paths) {
+    var svg = document.createElementNS(
+      'http://www.w3.org/2000/svg', 'svg'
+    );
+
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+
+    paths.forEach(function(item) {
+      var shape = document.createElementNS(
+        'http://www.w3.org/2000/svg', item.tag
+      );
+
+      Object.keys(item.attrs).forEach(function(key) {
+        shape.setAttribute(key, item.attrs[key]);
+      });
+
+      svg.appendChild(shape);
+    });
+
+    return svg;
+  }
+
+  buttons.forEach(function(button) {
+    var copy = button.querySelector('.code-copy-icon');
+    var check = button.querySelector('.code-check-icon');
+
+    if (copy) {
+      copy.replaceChildren(createIcon([
+        {
+          tag: 'rect',
+          attrs: { x: '9', y: '9', width: '11', height: '11', rx: '2' }
+        },
+        {
+          tag: 'rect',
+          attrs: { x: '4', y: '4', width: '11', height: '11', rx: '2' }
+        }
+      ]));
+    }
+
+    if (check) {
+      check.replaceChildren(createIcon([
+        {
+          tag: 'path',
+          attrs: { d: 'M20 6L9 17l-5-5' }
+        }
+      ]));
+    }
+  });
+}
 
 // Post-process: resolve local images via IPC
 function resolveLocalImages() {

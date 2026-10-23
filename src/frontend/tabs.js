@@ -158,10 +158,13 @@ var TabManager = (function() {
       if (tab.parsedHtml) {
         document.getElementById('preview').innerHTML = tab.parsedHtml;
       } else {
-        var html = marked.parse(tab.content);
+        var html = renderMarkdownSafe(tab.content);
         document.getElementById('preview').innerHTML = html;
         tab.parsedHtml = html;
       }
+
+      restoreCodeCopyIcons(document.getElementById('preview'));
+
       if (typeof resolveLocalImages === 'function') resolveLocalImages();
     } else {
       if (tab.mode !== currentMode) {
@@ -176,10 +179,13 @@ var TabManager = (function() {
         if (tab.parsedHtml) {
           document.getElementById('preview').innerHTML = tab.parsedHtml;
         } else {
-          var html = marked.parse(tab.content);
+          var html = renderMarkdownSafe(tab.content);
           document.getElementById('preview').innerHTML = html;
           tab.parsedHtml = html;
         }
+
+        restoreCodeCopyIcons(document.getElementById('preview'));
+
         if (typeof resolveLocalImages === 'function') resolveLocalImages();
         setTimeout(function() {
           document.getElementById('preview-container').scrollTop = tab.scrollTop;
@@ -191,6 +197,15 @@ var TabManager = (function() {
     if (typeof updateWordCount === 'function') updateWordCount();
     if (typeof showRecentPanel === 'function') showRecentPanel();
     if (typeof tocOpen !== 'undefined' && tocOpen && typeof updateTOC === 'function') updateTOC();
+
+    if (typeof doFind === 'function' &&
+        typeof findState !== 'undefined' &&
+        findState.open) {
+      doFind(document.getElementById('find-input').value);
+    } else if (typeof updateEditorSearchHighlights === 'function' &&
+              editorSearchLayer) {
+      updateEditorSearchHighlights();
+    }
   }
 
   function markDirty(id) {

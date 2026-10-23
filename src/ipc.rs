@@ -43,6 +43,17 @@ pub fn handle_ipc_message(
     };
 
     match parsed.command.as_str() {
+        "open_external" => {
+            if let Some(url) = parsed.path {
+                if let Ok(parsed_url) = url::Url::parse(&url) {
+                    if matches!(parsed_url.scheme(), "http" | "https") {
+                        if let Err(e) = webbrowser::open(&url) {
+                            eprintln!("Failed to open external URL: {e}");
+                        }
+                    }
+                }
+            }
+        }
         "open_file" => {
             let path = parsed.path.or_else(file_ops::pick_open_file);
             if let Some(p) = path {

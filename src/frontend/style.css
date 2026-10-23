@@ -474,8 +474,8 @@ body.preview-resizing #preview {
 #preview .code-block-language {
   font-size: 12px;
   line-height: 1;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none;
+  letter-spacing: 0.02em;
   color: var(--text-muted);
   font-weight: 600;
   user-select: none;
@@ -1596,4 +1596,37 @@ mark.find-match.find-active {
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-secondary);
+}
+
+
+/* Search match highlighting for the textarea */
+.editor-search-layer {
+  position: absolute;
+  z-index: 0;
+  box-sizing: border-box;
+  overflow: auto;
+  pointer-events: none;
+
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+
+  scrollbar-width: none;
+}
+
+.editor-search-layer::-webkit-scrollbar {
+  display: none;
+}
+
+.editor-search-layer .editor-find-match {
+  background: rgba(239, 185, 65, 0.38);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  border-radius: 2px;
+}
+
+.editor-search-layer .editor-find-match.active {
+  background: rgba(239, 158, 35, 0.75);
+  outline: 1px solid rgba(190, 119, 25, 0.7);
 }

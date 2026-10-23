@@ -27,6 +27,7 @@ const PREVIEW_JS: &str = include_str!("frontend/preview.js");
 const TABS_JS: &str = include_str!("frontend/tabs.js");
 const MARKED_JS: &str = include_str!("frontend/marked.min.js");
 const HLJS: &str = include_str!("frontend/highlight.min.js");
+const DOMPURIFY_JS: &str = include_str!("frontend/vendor/purify.min.js");
 
 #[derive(Debug)]
 enum UserEvent {
@@ -182,6 +183,16 @@ fn main() {
             }
         })
         .with_url("http://markdown-viewer.localhost/")
+        .with_navigation_handler(|url| {
+            // Only allow navigation within the application origin.
+            url::Url::parse(&url)
+                .map(|parsed| {
+                    parsed.scheme() == "http"
+                        && parsed.host_str() == Some("markdown-viewer.localhost")
+                        && parsed.port_or_known_default() == Some(80)
+                })
+                .unwrap_or(false)
+        })
         .with_ipc_handler(move |request| {
             let body = request.body().to_string();
             let _ = proxy_ipc.send_event(UserEvent::IpcMessage(body));
@@ -320,12 +331,15 @@ fn escape_for_script_tag(js: &str) -> String {
     js.replace("</script", "<\\/script")
 }
 
+
 fn build_html() -> String {
     // Build script tags with escaped content
+    // Load order: highlight.js, marked.js, DOMPurify, then app scripts
     let scripts = format!(
-        "<script>{}</script>\n<script>{}</script>\n<script>{}</script>\n<script>{}</script>\n<script>{}</script>\n<script>{}</script>",
+        "<script>{}</script>\n<script>{}</script>\n<script>{}</script>\n<script>{}</script>\n<script>{}</script>\n<script>{}</script>\n<script>{}</script>",
         escape_for_script_tag(HLJS),
         escape_for_script_tag(MARKED_JS),
+        escape_for_script_tag(DOMPURIFY_JS),
         escape_for_script_tag(PREVIEW_JS),
         escape_for_script_tag(TABS_JS),
         escape_for_script_tag(EDITOR_JS),

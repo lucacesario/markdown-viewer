@@ -10,6 +10,48 @@ function sendToRust(command, data) {
   window.ipc.postMessage(msg);
 }
 
+/*
+ * Open external Markdown links in the default browser.
+ * Keep the Markdown Viewer on its own document.
+ */
+document.addEventListener('click', function(event) {
+  if (!event.target || !event.target.closest) return;
+
+  var link = event.target.closest('a[href]');
+  if (!link) return;
+
+  if (!link.closest('#preview, #guide-content')) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  var href = link.getAttribute('href');
+  if (!href) return;
+
+  // Preserve in-document heading navigation.
+  if (href.charAt(0) === '#') {
+    var target = document.getElementById(
+      decodeURIComponent(href.substring(1))
+    );
+    if (target) target.scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+
+  try {
+    var url = new URL(href, document.baseURI);
+
+    // Only external HTTP(S) URLs can launch the browser.
+    if (
+      (url.protocol === 'https:' || url.protocol === 'http:') &&
+      url.hostname !== 'markdown-viewer.localhost'
+    ) {
+      sendToRust('open_external', { path: url.href });
+    }
+  } catch (error) {
+    console.warn('Invalid Markdown link:', href);
+  }
+});
+
 // Rust calls this to send events to JS
 window.__fromRust = function(event, data) {
   switch (event) {
@@ -179,10 +221,11 @@ function toggleMode() {
     if (tab && tab.parsedHtml) {
       previewEl.innerHTML = tab.parsedHtml;
     } else {
-      var html = marked.parse(content);
+      var html = renderMarkdownSafe(content);
       previewEl.innerHTML = html;
       if (tab) tab.parsedHtml = html;
     }
+    restoreCodeCopyIcons(previewEl);
     resolveLocalImages();
     ($.editorContainer || document.getElementById('editor-container')).classList.remove('active');
     ($.previewContainer || document.getElementById('preview-container')).classList.add('active');
@@ -266,10 +309,11 @@ function toggleSplit() {
     if (splitTab && splitTab.parsedHtml) {
       splitPreviewEl.innerHTML = splitTab.parsedHtml;
     } else {
-      var splitHtml = marked.parse(splitContent);
+      var splitHtml = renderMarkdownSafe(splitContent);
       splitPreviewEl.innerHTML = splitHtml;
       if (splitTab) splitTab.parsedHtml = splitHtml;
     }
+    restoreCodeCopyIcons(splitPreviewEl);
     resolveLocalImages();
     currentMode = 'edit';
     document.getElementById('btn-toggle').classList.remove('active');
@@ -318,9 +362,10 @@ function updateSplitPreview() {
         editor.value;
 
       var html =
-        marked.parse(content);
+        renderMarkdownSafe(content);
 
       preview.innerHTML = html;
+      restoreCodeCopyIcons(preview);
 
       if (tab) {
         tab.parsedHtml = html;
@@ -663,6 +708,21 @@ lineNumberResizeObserver.observe(
   document.getElementById('editor')
 );
 
+lineNumberResizeObserver.observe(
+  document.getElementById('editor')
+);
+
+// Keep search decorations aligned after layout changes.
+window.addEventListener('resize', function() {
+  if (editorSearchLayer) updateEditorSearchHighlights();
+});
+
+document.getElementById('editor').addEventListener('input', function() {
+  if (findState.open) {
+    doFind(document.getElementById('find-input').value);
+  }
+});
+
 function syncLineNumberScroll() {
   var editor = $.editor || document.getElementById('editor');
   var gutter = document.getElementById('line-numbers');
@@ -670,6 +730,10 @@ function syncLineNumberScroll() {
   if (!editor || !gutter) return;
 
   gutter.scrollTop = editor.scrollTop;
+  if (editorSearchLayer) {
+    editorSearchLayer.scrollTop = editor.scrollTop;
+    editorSearchLayer.scrollLeft = editor.scrollLeft;
+  }
 }
 
 // Recent Files
@@ -917,6 +981,94 @@ document.addEventListener('wheel', function(e) {
   });
 })();
 
+
+/* Search highlighting behind the editor textarea */
+var editorSearchLayer = null;
+
+function updateEditorSearchHighlights() {
+  var editor = document.getElementById('editor');
+  if (!editor) return;
+
+  if (!editorSearchLayer) {
+    var parent = editor.parentElement;
+
+    if (getComputedStyle(parent).position === 'static') {
+      parent.style.position = 'relative';
+    }
+
+    editorSearchLayer = document.createElement('div');
+    editorSearchLayer.className = 'editor-search-layer';
+    editorSearchLayer.setAttribute('aria-hidden', 'true');
+
+    parent.insertBefore(editorSearchLayer, editor);
+
+    var background = getComputedStyle(editor).backgroundColor;
+    editorSearchLayer.style.backgroundColor = background;
+
+    editor.style.position = 'relative';
+    editor.style.zIndex = '1';
+    editor.style.backgroundColor = 'transparent';
+  }
+
+  var layer = editorSearchLayer;
+  var style = getComputedStyle(editor);
+  var parentRect = editor.parentElement.getBoundingClientRect();
+  var editorRect = editor.getBoundingClientRect();
+
+  layer.style.left = (editorRect.left - parentRect.left) + 'px';
+  layer.style.top = (editorRect.top - parentRect.top) + 'px';
+  layer.style.width = editorRect.width + 'px';
+  layer.style.height = editorRect.height + 'px';
+
+  [
+    'fontFamily', 'fontSize', 'fontWeight', 'fontStyle',
+    'lineHeight', 'letterSpacing', 'tabSize',
+    'padding', 'border', 'borderRadius',
+    'whiteSpace', 'overflowWrap', 'wordBreak'
+  ].forEach(function(prop) {
+    layer.style[prop] = style[prop];
+  });
+
+  layer.replaceChildren();
+
+  if (findState.open && findState.matches.length) {
+    var content = editor.value;
+    var position = 0;
+    var fragment = document.createDocumentFragment();
+
+    findState.matches.forEach(function(match, index) {
+      fragment.appendChild(
+        document.createTextNode(
+          content.substring(position, match.start)
+        )
+      );
+
+      var mark = document.createElement('mark');
+      mark.className = 'editor-find-match';
+
+      if (index === findState.current) {
+        mark.classList.add('active');
+      }
+
+      mark.textContent = content.substring(match.start, match.end);
+      fragment.appendChild(mark);
+
+      position = match.end;
+    });
+
+    fragment.appendChild(
+      document.createTextNode(content.substring(position))
+    );
+
+    layer.appendChild(fragment);
+  } else {
+    layer.textContent = editor.value;
+  }
+
+  layer.scrollTop = editor.scrollTop;
+  layer.scrollLeft = editor.scrollLeft;
+}
+
 // Find
 var findState = { open: false, matches: [], current: -1, marks: [] };
 
@@ -937,6 +1089,7 @@ function closeFind() {
   clearPreviewHighlights();
   document.getElementById('find-count').textContent = '';
   if (currentMode === 'edit') document.getElementById('editor').focus();
+  updateEditorSearchHighlights();
 }
 
 function doFind(term) {
@@ -983,6 +1136,7 @@ function doFind(term) {
     goToMatch(0);
   }
   updateFindCount();
+  updateEditorSearchHighlights();
 }
 
 function clearPreviewHighlights() {
@@ -998,12 +1152,35 @@ function clearPreviewHighlights() {
 
 function goToMatch(idx) {
   findState.current = idx;
+
   if (currentMode === 'edit') {
     var match = findState.matches[idx];
     var editor = document.getElementById('editor');
-    editor.focus();
-    editor.selectionStart = match.start;
-    editor.selectionEnd = match.end;
+    var findInput = document.getElementById('find-input');
+
+    // Select the current match.
+    editor.setSelectionRange(match.start, match.end);
+
+    // Scroll to the line containing the match.
+    var textBefore = editor.value.substring(0, match.start);
+    var lineNumber = textBefore.split('\n').length - 1;
+
+    var computedStyle = window.getComputedStyle(editor);
+    var lineHeight = parseFloat(computedStyle.lineHeight);
+
+    if (!lineHeight || isNaN(lineHeight)) {
+      lineHeight = parseFloat(computedStyle.fontSize) * 1.8;
+    }
+
+    editor.scrollTop = Math.max(
+      0,
+      lineNumber * lineHeight - editor.clientHeight / 3
+    );
+
+    // Keep typing in Find uninterrupted.
+    if (document.activeElement === findInput) {
+      findInput.focus();
+    }
   } else {
     findState.marks.forEach(function(m) { m.classList.remove('find-active'); });
     var mark = findState.marks[idx];
@@ -1011,6 +1188,7 @@ function goToMatch(idx) {
     mark.scrollIntoView({ block: 'center' });
   }
   updateFindCount();
+  updateEditorSearchHighlights();
 }
 
 function findNext() {
@@ -1036,9 +1214,18 @@ document.getElementById('find-input').addEventListener('input', function() {
   doFind(this.value);
 });
 document.getElementById('find-input').addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { closeFind(); e.preventDefault(); }
-  else if (e.key === 'Enter' && !e.shiftKey) { findNext(); e.preventDefault(); }
-  else if (e.key === 'Enter' && e.shiftKey) { findPrev(); e.preventDefault(); }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeFind();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+
+    if (e.shiftKey) {
+      findPrev();
+    } else {
+      findNext();
+    }
+  }
 });
 document.getElementById('find-close').addEventListener('click', closeFind);
 document.getElementById('find-next').addEventListener('click', findNext);
@@ -1280,8 +1467,9 @@ function exportPdf(options) {
   var preview =
     document.getElementById('preview');
 
-  var html = marked.parse(editor.value);
+  var html = renderMarkdownSafe(editor.value);
   preview.innerHTML = html;
+  restoreCodeCopyIcons(preview);
 
   var tab = TabManager.getActiveTab();
 
@@ -1371,9 +1559,10 @@ function openMarkdownGuide() {
 
   if (!modal || !content) return;
 
-  content.innerHTML = marked.parse(
+  content.innerHTML = renderMarkdownSafe(
     window.__MARKDOWN_GUIDE__ || ''
   );
+  restoreCodeCopyIcons(content);
 
   content.scrollTop = 0;
   modal.classList.add('visible');
