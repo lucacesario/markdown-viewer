@@ -1,4 +1,8 @@
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Deserialize;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tao::window::Window;
 use wry::WebView;
@@ -7,9 +11,7 @@ use crate::file_ops;
 use crate::state::AppState;
 
 use webview2_com::Microsoft::Web::WebView2::Win32::{
-    ICoreWebView2_2,
-    ICoreWebView2_7,
-    ICoreWebView2Environment6,
+    ICoreWebView2Environment6, ICoreWebView2_2, ICoreWebView2_7,
 };
 
 use webview2_com::PrintToPdfCompletedHandler;
@@ -43,6 +45,40 @@ pub fn handle_ipc_message(
     };
 
     match parsed.command.as_str() {
+        "save_screenshot" => {
+            if let (Some(document_path), Some(image_data)) =
+                (parsed.path.as_deref(), parsed.content.as_deref())
+            {
+                match save_screenshot(document_path, image_data) {
+                    Ok(relative_path) => {
+                        send_to_js(
+                            webview,
+                            "screenshot_saved",
+                            &serde_json::json!({
+                                "path": relative_path
+                            }),
+                        );
+                    }
+                    Err(message) => {
+                        send_to_js(
+                            webview,
+                            "error",
+                            &serde_json::json!({
+                                "message": message
+                            }),
+                        );
+                    }
+                }
+            } else {
+                send_to_js(
+                    webview,
+                    "error",
+                    &serde_json::json!({
+                        "message": "Save the Markdown document before pasting images."
+                    }),
+                );
+            }
+        }
         "open_external" => {
             if let Some(url) = parsed.path {
                 if let Ok(parsed_url) = url::Url::parse(&url) {
@@ -55,18 +91,26 @@ pub fn handle_ipc_message(
             }
         }
         "open_file" => {
-            let path = parsed.path.or_else(file_ops::pick_open_file);
+            let path = parsed.path.or_else(|| file_ops::pick_open_file(window));
             if let Some(p) = path {
                 match file_ops::read_file(&p) {
                     Ok(contents) => {
-                        send_to_js(webview, "file_opened", &serde_json::json!({
-                            "content": contents,
-                            "path": p
-                        }));
+                        send_to_js(
+                            webview,
+                            "file_opened",
+                            &serde_json::json!({
+                                "content": contents,
+                                "path": p
+                            }),
+                        );
                     }
-                    Err(e) => send_to_js(webview, "error", &serde_json::json!({
-                        "message": format!("Failed to open file: {e}")
-                    })),
+                    Err(e) => send_to_js(
+                        webview,
+                        "error",
+                        &serde_json::json!({
+                            "message": format!("Failed to open file: {e}")
+                        }),
+                    ),
                 }
             }
         }
@@ -75,21 +119,29 @@ pub fn handle_ipc_message(
                 if let Some(ref path) = parsed.path {
                     match file_ops::write_file(path, content) {
                         Ok(_) => {
-                            send_to_js(webview, "file_saved", &serde_json::json!({
-                                "path": path
-                            }));
+                            send_to_js(
+                                webview,
+                                "file_saved",
+                                &serde_json::json!({
+                                    "path": path
+                                }),
+                            );
                         }
-                        Err(e) => send_to_js(webview, "error", &serde_json::json!({
-                            "message": format!("Failed to save: {e}")
-                        })),
+                        Err(e) => send_to_js(
+                            webview,
+                            "error",
+                            &serde_json::json!({
+                                "message": format!("Failed to save: {e}")
+                            }),
+                        ),
                     }
                 } else {
-                    handle_save_as(webview, parsed.content);
+                    handle_save_as(webview, window, parsed.content);
                 }
             }
         }
         "save_as" => {
-            handle_save_as(webview, parsed.content);
+            handle_save_as(webview, window, parsed.content);
         }
         "set_title" => {
             if let Some(title) = parsed.title {
@@ -106,14 +158,9 @@ pub fn handle_ipc_message(
                 // Leaving maximized mode.
                 window.set_maximized(false);
 
-                let (pos, size, _) =
-                    crate::window_state::load_window_state();
+                let (pos, size, _) = crate::window_state::load_window_state();
 
-                crate::window_state::save_window_state(
-                    pos,
-                    size,
-                    false,
-                );
+                crate::window_state::save_window_state(pos, size, false);
             } else {
                 // Save the current normal rectangle before maximizing.
                 let inner_size = window.inner_size();
@@ -157,41 +204,58 @@ pub fn handle_ipc_message(
         }
         "drag_enter" => {
             let _ = webview.evaluate_script(
-                "document.getElementById('drop-overlay').classList.add('visible')");
+                "document.getElementById('drop-overlay').classList.add('visible')",
+            );
         }
         "drag_leave" => {
             let _ = webview.evaluate_script(
-                "document.getElementById('drop-overlay').classList.remove('visible')");
+                "document.getElementById('drop-overlay').classList.remove('visible')",
+            );
         }
         "ready" => {
             let (pending_file, pending_content, pending_title) = {
                 let mut st = state.lock().unwrap();
-                (st.pending_file.take(), st.pending_content.take(), st.pending_title.take())
+                (
+                    st.pending_file.take(),
+                    st.pending_content.take(),
+                    st.pending_title.take(),
+                )
             };
             if let Some(p) = pending_file {
                 match file_ops::read_file(&p) {
                     Ok(contents) => {
-                        send_to_js(webview, "file_opened", &serde_json::json!({
-                            "content": contents,
-                            "path": p
-                        }));
+                        send_to_js(
+                            webview,
+                            "file_opened",
+                            &serde_json::json!({
+                                "content": contents,
+                                "path": p
+                            }),
+                        );
                     }
-                    Err(e) => send_to_js(webview, "error", &serde_json::json!({
-                        "message": format!("Failed to open file: {e}")
-                    })),
+                    Err(e) => send_to_js(
+                        webview,
+                        "error",
+                        &serde_json::json!({
+                            "message": format!("Failed to open file: {e}")
+                        }),
+                    ),
                 }
             } else if let Some(content) = pending_content {
                 let title = pending_title.unwrap_or_else(|| "stdin".to_string());
-                send_to_js(webview, "stdin_opened", &serde_json::json!({
-                    "content": content,
-                    "title": title
-                }));
+                send_to_js(
+                    webview,
+                    "stdin_opened",
+                    &serde_json::json!({
+                        "content": content,
+                        "title": title
+                    }),
+                );
             }
             window.set_visible(true);
-
         }
         "export_pdf" => {
-            if let Some(path) = file_ops::pick_pdf_file() {
+            if let Some(path) = file_ops::pick_pdf_file(window) {
                 send_to_js(
                     webview,
                     "pdf_path_selected",
@@ -207,83 +271,39 @@ pub fn handle_ipc_message(
                     let controller = webview.controller();
 
                     if let Ok(core) = controller.CoreWebView2() {
-                        if let Ok(core2) =
-                            core.cast::<ICoreWebView2_2>()
-                        {
-                            if let Ok(environment) =
-                                core2.Environment()
-                            {
+                        if let Ok(core2) = core.cast::<ICoreWebView2_2>() {
+                            if let Ok(environment) = core2.Environment() {
                                 if let Ok(environment6) =
-                                    environment.cast::<
-                                        ICoreWebView2Environment6
-                                    >()
+                                    environment.cast::<ICoreWebView2Environment6>()
                                 {
-                                    if let Ok(settings) =
-                                        environment6.CreatePrintSettings()
-                                    {
-                                        let _ =
-                                            settings
-                                                .SetShouldPrintHeaderAndFooter(
-                                                    false
-                                                );
+                                    if let Ok(settings) = environment6.CreatePrintSettings() {
+                                        let _ = settings.SetShouldPrintHeaderAndFooter(false);
 
-                                        let _ =
-                                            settings
-                                                .SetShouldPrintBackgrounds(
-                                                    true
-                                                );
+                                        let _ = settings.SetShouldPrintBackgrounds(true);
 
-                                        if let Ok(core7) =
-                                            core.cast::<ICoreWebView2_7>()
-                                        {
-                                            let wide_path:
-                                                Vec<u16> = path
+                                        if let Ok(core7) = core.cast::<ICoreWebView2_7>() {
+                                            let wide_path: Vec<u16> = path
                                                 .encode_utf16()
-                                                .chain(
-                                                    std::iter::once(0)
-                                                )
+                                                .chain(std::iter::once(0))
                                                 .collect();
 
-                                            let pdf_path =
-                                                PCWSTR(
-                                                    wide_path.as_ptr()
-                                                );
+                                            let pdf_path = PCWSTR(wide_path.as_ptr());
 
-                                            let saved_path =
-                                                path.clone();
+                                            let saved_path = path.clone();
 
-                                            let handler =
-                                                PrintToPdfCompletedHandler::create(
-                                                    Box::new(
-                                                        move |
-                                                            error_code,
-                                                            success
-                                                        | {
-                                                            if error_code
-                                                                .is_ok()
-                                                                && success
-                                                            {
-                                                                println!(
-                                                                    "PDF saved: {}",
-                                                                    saved_path
-                                                                );
-                                                            } else {
-                                                                eprintln!(
-                                                                    "PDF export failed"
-                                                                );
-                                                            }
+                                            let handler = PrintToPdfCompletedHandler::create(
+                                                Box::new(move |error_code, success| {
+                                                    if error_code.is_ok() && success {
+                                                        println!("PDF saved: {}", saved_path);
+                                                    } else {
+                                                        eprintln!("PDF export failed");
+                                                    }
 
-                                                            Ok(())
-                                                        },
-                                                    ),
-                                                );
+                                                    Ok(())
+                                                }),
+                                            );
 
-                                            let _ =
-                                                core7.PrintToPdf(
-                                                    pdf_path,
-                                                    &settings,
-                                                    &handler,
-                                                );
+                                            let _ = core7.PrintToPdf(pdf_path, &settings, &handler);
                                         }
                                     }
                                 }
@@ -297,21 +317,26 @@ pub fn handle_ipc_message(
     }
 }
 
-fn handle_save_as(
-    webview: &WebView,
-    content: Option<String>,
-) {
+fn handle_save_as(webview: &WebView, window: &Window, content: Option<String>) {
     if let Some(content) = content {
-        if let Some(path) = file_ops::pick_save_file() {
+        if let Some(path) = file_ops::pick_save_file(window) {
             match file_ops::write_file(&path, &content) {
                 Ok(_) => {
-                    send_to_js(webview, "file_saved", &serde_json::json!({
-                        "path": path
-                    }));
+                    send_to_js(
+                        webview,
+                        "file_saved",
+                        &serde_json::json!({
+                            "path": path
+                        }),
+                    );
                 }
-                Err(e) => send_to_js(webview, "error", &serde_json::json!({
-                    "message": format!("Failed to save: {e}")
-                })),
+                Err(e) => send_to_js(
+                    webview,
+                    "error",
+                    &serde_json::json!({
+                        "message": format!("Failed to save: {e}")
+                    }),
+                ),
             }
         }
     }
@@ -324,4 +349,93 @@ fn send_to_js(webview: &WebView, event: &str, data: &serde_json::Value) {
         serde_json::to_string(data).unwrap(),
     );
     let _ = webview.evaluate_script(&script);
+}
+
+fn save_screenshot(document_path: &str, image_data: &str) -> Result<String, String> {
+    const MAX_IMAGE_BYTES: usize = 15 * 1024 * 1024;
+
+    // Require a previously saved Markdown document.
+    let document = Path::new(document_path)
+        .canonicalize()
+        .map_err(|_| "Save the Markdown document before pasting images.".to_string())?;
+
+    if !document.is_file() {
+        return Err("The Markdown document does not exist.".to_string());
+    }
+
+    let extension = document
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+
+    if !extension.eq_ignore_ascii_case("md") && !extension.eq_ignore_ascii_case("markdown") {
+        return Err("Screenshot pasting requires a Markdown document.".to_string());
+    }
+
+    let parent = document
+        .parent()
+        .ok_or("Cannot locate the document folder.")?;
+
+    let stem = document
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .ok_or("Invalid Markdown filename.")?;
+
+    // Build a folder named after the document.
+    let assets_name = format!("{stem}.assets");
+    let assets_dir = parent.join(&assets_name);
+
+    // Limit the image size before decoding.
+    if image_data.len() > (MAX_IMAGE_BYTES * 4 / 3) + 8 {
+        return Err("Screenshot exceeds the 15 MB limit.".to_string());
+    }
+
+    let image_bytes = STANDARD
+        .decode(image_data)
+        .map_err(|_| "Invalid screenshot encoding.".to_string())?;
+
+    if image_bytes.len() > MAX_IMAGE_BYTES {
+        return Err("Screenshot exceeds the 15 MB limit.".to_string());
+    }
+
+    // Verify the PNG signature.
+    const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+
+    if !image_bytes.starts_with(PNG_SIGNATURE) {
+        return Err("Clipboard image is not a PNG.".to_string());
+    }
+
+    fs::create_dir_all(&assets_dir).map_err(|e| format!("Cannot create assets folder: {e}"))?;
+
+    // Create unique filenames without overwriting existing screenshots.
+    for number in 1..=9999 {
+        let filename = format!("screenshot-{number:03}.png");
+        let image_path = assets_dir.join(&filename);
+
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&image_path);
+
+        match file {
+            Ok(mut file) => {
+                if let Err(e) = file.write_all(&image_bytes) {
+                    drop(file);
+                    let _ = fs::remove_file(&image_path);
+                    return Err(format!("Cannot save screenshot: {e}"));
+                }
+
+                // Relative Markdown path, with forward slashes.
+                return Ok(format!("{assets_name}/{filename}"));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                continue;
+            }
+            Err(e) => {
+                return Err(format!("Cannot create screenshot file: {e}"));
+            }
+        }
+    }
+
+    Err("Too many screenshots in this assets folder.".to_string())
 }

@@ -55,6 +55,58 @@ document.addEventListener('click', function(event) {
 // Rust calls this to send events to JS
 window.__fromRust = function(event, data) {
   switch (event) {
+    case 'screenshot_saved': {
+      var pending = window.pendingScreenshotPaste;
+      window.pendingScreenshotPaste = null;
+
+      if (!pending || !data || !data.path) {
+        showError('Screenshot saved, but no insertion location was found.');
+        break;
+      }
+
+      var activeTab = TabManager.getActiveTab();
+      var editor = document.getElementById('editor');
+
+      // Avoid inserting into the wrong document if tabs changed.
+      if (
+        !activeTab ||
+        activeTab.id !== pending.tabId ||
+        activeTab.path !== pending.documentPath
+      ) {
+        showError(
+          'Screenshot saved, but the active document changed. ' +
+          'Return to the original document to insert its image path.'
+        );
+        break;
+      }
+
+      // Escape spaces and parentheses for Markdown links.
+      var imagePath = encodeURI(
+        data.path.replace(/\\/g, '/')
+      ).replace(/\(/g, '%28').replace(/\)/g, '%29');
+
+      var markdown = '![Screenshot](' + imagePath + ')';
+
+      editor.setRangeText(
+        markdown,
+        pending.start,
+        pending.end,
+        'end'
+      );
+
+      // Programmatic changes need an input event.
+      editor.dispatchEvent(new Event('input', {
+        bubbles: true
+      }));
+
+      // Mark the document dirty immediately.
+      TabManager.markDirty();
+
+      editor.focus();
+
+      console.log('Screenshot saved:', data.path);
+      break;
+    }
     case 'file_opened':
       addRecentFile(data.path);
       TabManager.createTab(data.path, data.content);
@@ -71,6 +123,7 @@ window.__fromRust = function(event, data) {
       TabManager.createTab(null, data.content, 'preview', data.title || 'stdin');
       break;
     case 'error':
+      window.pendingScreenshotPaste = null;
       showError(data.message);
       break;
     case 'pdf_path_selected':
@@ -1320,14 +1373,64 @@ document.getElementById('find-prev').addEventListener('click', findPrev);
   var image = document.getElementById('lightbox-image');
   var title = document.getElementById('lightbox-title');
   var zoomLabel = document.getElementById('lightbox-zoom-label');
+  var viewport = document.getElementById('lightbox-viewport');
+  var canvas = document.getElementById('lightbox-canvas');
   var zoom = 1;
   var previousFocus = null;
 
   function setZoom(value) {
     zoom = Math.max(0.5, Math.min(4, value));
-    image.style.transform = 'scale(' + zoom + ')';
     zoomLabel.textContent = Math.round(zoom * 100) + '%';
+
+    if (!image.naturalWidth || !image.naturalHeight) return;
+
+    // Fit the original image inside the viewport at 100%.
+    var availableWidth = Math.max(1, viewport.clientWidth - 40);
+    var availableHeight = Math.max(1, viewport.clientHeight - 40);
+
+    var fit = Math.min(
+      1,
+      availableWidth / image.naturalWidth,
+      availableHeight / image.naturalHeight
+    );
+
+    var width = Math.round(image.naturalWidth * fit * zoom);
+    var height = Math.round(image.naturalHeight * fit * zoom);
+
+    // Change actual layout dimensions, not just visual scale.
+    image.style.width = width + 'px';
+    image.style.height = height + 'px';
+    image.style.transform = 'none';
+
+    canvas.style.width = Math.max(
+      viewport.clientWidth,
+      width + 40
+    ) + 'px';
+
+    canvas.style.height = Math.max(
+      viewport.clientHeight,
+      height + 40
+    ) + 'px';
+
+    // Keep the enlarged image centred initially.
+    viewport.scrollLeft =
+      Math.max(0, (canvas.offsetWidth - viewport.clientWidth) / 2);
+
+    viewport.scrollTop =
+      Math.max(0, (canvas.offsetHeight - viewport.clientHeight) / 2);
   }
+
+  image.addEventListener('load', function() {
+    if (modal.classList.contains('visible')) {
+      setZoom(zoom);
+    }
+  });
+
+  window.addEventListener('resize', function() {
+    if (modal.classList.contains('visible')) {
+      setZoom(zoom);
+    }
+  });
 
   function openLightbox(sourceImage) {
     if (!sourceImage.complete || !sourceImage.naturalWidth) return;
@@ -1341,21 +1444,41 @@ document.getElementById('find-prev').addEventListener('click', findPrev);
     image.alt = sourceImage.alt || '';
     title.textContent = sourceImage.alt || 'Image preview';
 
-    setZoom(1);
     modal.classList.add('visible');
     modal.setAttribute('aria-hidden', 'false');
+
+    setZoom(1);
     document.getElementById('lightbox-close').focus();
   }
 
   function closeLightbox() {
+    // Move focus outside the dialog before hiding it.
+    if (
+      previousFocus &&
+      previousFocus.isConnected &&
+      previousFocus !== document.body &&
+      !modal.contains(previousFocus)
+    ) {
+      previousFocus.focus();
+    } else {
+      document.getElementById('editor').focus();
+    }
+
     modal.classList.remove('visible');
     modal.setAttribute('aria-hidden', 'true');
-    image.removeAttribute('src');
-    setZoom(1);
 
-    if (previousFocus && previousFocus.isConnected) {
-      previousFocus.focus();
-    }
+    image.removeAttribute('src');
+    image.style.width = '';
+    image.style.height = '';
+
+    canvas.style.width = '';
+    canvas.style.height = '';
+
+    viewport.scrollLeft = 0;
+    viewport.scrollTop = 0;
+
+    zoom = 1;
+    zoomLabel.textContent = '100%';
     previousFocus = null;
   }
 
@@ -1405,6 +1528,74 @@ document.getElementById('find-prev').addEventListener('click', findPrev);
     }
   }, true);
 })();
+
+/* Save-before-pasting screenshot modal */
+
+function openScreenshotSaveModal() {
+  var modal = document.getElementById('screenshot-save-modal');
+
+  if (!modal) return;
+
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+
+  document.getElementById('screenshot-save-confirm').focus();
+}
+
+function closeScreenshotSaveModal() {
+  var modal = document.getElementById('screenshot-save-modal');
+
+  if (!modal) return;
+
+  // Return focus to the editor before hiding the modal.
+  document.getElementById('editor').focus();
+
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+document.getElementById('screenshot-save-cancel')
+  .addEventListener('click', function() {
+    closeScreenshotSaveModal();
+  });
+
+document.getElementById('screenshot-save-confirm')
+  .addEventListener('click', function() {
+    closeScreenshotSaveModal();
+
+    var tab = TabManager.getActiveTab();
+
+    if (!tab) {
+      showError('No active document to save.');
+      return;
+    }
+
+    // Open the existing native Windows Save As dialog.
+    sendToRust('save_as', {
+      content: document.getElementById('editor').value
+    });
+  });
+
+document.getElementById('screenshot-save-modal')
+  .addEventListener('click', function(event) {
+    if (event.target === this) {
+      closeScreenshotSaveModal();
+    }
+  });
+
+document.addEventListener('keydown', function(event) {
+  var modal = document.getElementById('screenshot-save-modal');
+
+  if (
+    event.key === 'Escape' &&
+    modal &&
+    modal.classList.contains('visible')
+  ) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeScreenshotSaveModal();
+  }
+}, true);
 
 // PDF Export
 var pdfExportInProgress = false;

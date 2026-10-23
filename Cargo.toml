@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
 wry = "0.49"
-tao = "0.33"
+tao = { version = "0.33", features = ["rwh_06"] }
 webview2-com = "0.35"
 windows = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 serde = { version = "1", features = ["derive"] }
@@ -16,6 +16,7 @@ dirs = "6"
 percent-encoding = "2"
 webbrowser = { version = "1.2.4", features = ["hardened"] }
 url = "2"
+base64 = "0.22"
 
 [build-dependencies]
 winresource = "0.1"

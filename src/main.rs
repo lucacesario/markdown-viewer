@@ -10,7 +10,9 @@ use tao::{
     window::{Icon, WindowBuilder},
 };
 use windows::Win32::Foundation::{HWND, RECT};
-use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOZORDER};
+use windows::Win32::UI::WindowsAndMessaging::{
+    SetWindowPos, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOZORDER,
+};
 use wry::{WebViewBuilder, WebViewBuilderExtWindows, WebViewExtWindows};
 
 mod file_ops;
@@ -37,9 +39,7 @@ enum UserEvent {
 fn load_window_icon() -> Option<Icon> {
     let bytes = include_bytes!("../assets/icon.png");
 
-    let image = image::load_from_memory(bytes)
-        .ok()?
-        .into_rgba8();
+    let image = image::load_from_memory(bytes).ok()?.into_rgba8();
 
     let (width, height) = image.dimensions();
 
@@ -99,8 +99,7 @@ fn main() {
             }
         }
     }
-    let (pos, size, was_maximized) =
-        window_state::load_window_state();
+    let (pos, size, was_maximized) = window_state::load_window_state();
 
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     let proxy: EventLoopProxy<UserEvent> = event_loop.create_proxy();
@@ -109,14 +108,8 @@ fn main() {
         .with_title("Markdown Viewer - Untitled")
         .with_window_icon(load_window_icon())
         .with_decorations(false)
-        .with_inner_size(LogicalSize::new(
-            size.0 as f64,
-            size.1 as f64,
-        ))
-        .with_position(LogicalPosition::new(
-            pos.0 as f64,
-            pos.1 as f64,
-        ))
+        .with_inner_size(LogicalSize::new(size.0 as f64, size.1 as f64))
+        .with_position(LogicalPosition::new(pos.0 as f64, pos.1 as f64))
         .with_visible(false)
         .build(&event_loop)
         .unwrap();
@@ -136,11 +129,20 @@ fn main() {
     let _webview = WebViewBuilder::new()
         .with_custom_protocol("markdown-viewer".to_string(), move |_id, request| {
             let uri = request.uri().path();
+
             if uri == "/" || uri == "/index.html" {
                 let st = state_proto.lock().unwrap();
+
                 wry::http::Response::builder()
-                    .header("Content-Type", "text/html")
+                    .header("Content-Type", "text/html; charset=utf-8")
                     .body(Cow::Owned(st.html.as_bytes().to_vec()))
+                    .unwrap()
+            } else if uri == "/favicon.ico" {
+                wry::http::Response::builder()
+                    .header("Content-Type", "image/x-icon")
+                    .body(Cow::Borrowed(
+                        include_bytes!("../assets/icon.ico").as_slice(),
+                    ))
                     .unwrap()
             } else if uri.starts_with("/local-image") {
                 let query = request.uri().query().unwrap_or("");
@@ -235,7 +237,7 @@ fn main() {
         .with_devtools(true)
         .build(&window)
         .expect("Failed to build WebView");
-    
+
     // window.set_visible(true);
 
     // Store CLI file path to open once JS is ready
@@ -248,12 +250,7 @@ fn main() {
 
         match event {
             Event::UserEvent(UserEvent::IpcMessage(msg)) => {
-                ipc::handle_ipc_message(
-                    &msg,
-                    &_webview,
-                    &window,
-                    &app_state,
-                );
+                ipc::handle_ipc_message(&msg, &_webview, &window, &app_state);
             }
 
             Event::WindowEvent {
@@ -283,9 +280,7 @@ fn main() {
                             0,
                             w,
                             h,
-                            SWP_ASYNCWINDOWPOS
-                                | SWP_NOACTIVATE
-                                | SWP_NOZORDER,
+                            SWP_ASYNCWINDOWPOS | SWP_NOACTIVATE | SWP_NOZORDER,
                         );
                     }
                 }
@@ -298,18 +293,12 @@ fn main() {
                 let maximized = window.is_maximized();
 
                 if maximized {
-                    let (pos, size, _) =
-                        window_state::load_window_state();
+                    let (pos, size, _) = window_state::load_window_state();
 
-                    window_state::save_window_state(
-                        pos,
-                        size,
-                        true,
-                    );
+                    window_state::save_window_state(pos, size, true);
                 } else {
                     let inner_size = window.inner_size();
-                    let outer_pos =
-                        window.outer_position().unwrap_or_default();
+                    let outer_pos = window.outer_position().unwrap_or_default();
 
                     window_state::save_window_state(
                         (outer_pos.x, outer_pos.y),
@@ -331,7 +320,6 @@ fn escape_for_script_tag(js: &str) -> String {
     js.replace("</script", "<\\/script")
 }
 
-
 fn build_html() -> String {
     // Build script tags with escaped content
     // Load order: highlight.js, marked.js, DOMPurify, then app scripts
@@ -346,8 +334,7 @@ fn build_html() -> String {
         escape_for_script_tag(APP_JS),
     );
 
-    let guide_json =
-        serde_json::to_string(GUIDE_MD).unwrap_or_else(|_| "\"\"".to_string());
+    let guide_json = serde_json::to_string(GUIDE_MD).unwrap_or_else(|_| "\"\"".to_string());
 
     INDEX_HTML
         .replace("/* __CSS__ */", STYLE_CSS)

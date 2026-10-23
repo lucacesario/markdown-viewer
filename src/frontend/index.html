@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <style>/* __CSS__ */</style>
 </head>
 <body>
@@ -267,7 +268,44 @@
     </div>
 
     <div id="lightbox-viewport" class="lightbox-viewport">
-      <img id="lightbox-image" alt="">
+      <div id="lightbox-canvas" class="lightbox-canvas">
+        <img id="lightbox-image" alt="">
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Save Before Pasting Screenshot -->
+<div id="screenshot-save-modal"
+     class="modal-backdrop"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="screenshot-save-title"
+     aria-hidden="true">
+
+  <div class="modal-card">
+    <h3 id="screenshot-save-title">
+      Save document to paste screenshot
+    </h3>
+
+    <p>
+      Screenshots are stored in a portable asset folder
+      beside your Markdown document.
+    </p>
+
+    <p>
+      Save the document first to insert this screenshot.
+    </p>
+
+    <div class="modal-actions">
+      <button id="screenshot-save-cancel" type="button">
+        Cancel
+      </button>
+
+      <button id="screenshot-save-confirm" class="primary" type="button">
+        Save &amp; Paste
+      </button>
     </div>
   </div>
 </div>

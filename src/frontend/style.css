@@ -1704,24 +1704,35 @@ mark.find-match.find-active {
   font-size: 12px;
 }
 
+
 .lightbox-viewport {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow: auto;
+  padding: 0;
+  display: block;
+  overscroll-behavior: contain;
+}
+
+.lightbox-canvas {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 100%;
+  min-height: 100%;
   padding: 20px;
 }
 
 #lightbox-image {
-  max-width: 100%;
-  max-height: 100%;
+  display: block;
+  flex: none;
   width: auto;
   height: auto;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
-  flex-shrink: 0;
-  transform-origin: center;
 }
 
 @media print {
@@ -1773,4 +1784,45 @@ mark.find-match.find-active {
   border-radius: inherit;
   background: var(--accent, #7187bd);
   transition: width 0.12s ease;
+}
+
+/* Markdown Viewer —  Save & Paste */
+
+#screenshot-save-modal .modal-card {
+  width: 340px;
+  max-width: calc(100vw - 40px);
+  padding: 18px;
+}
+
+#screenshot-save-modal #screenshot-save-title {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  margin: 0 0 16px;
+  letter-spacing: normal;
+}
+
+#screenshot-save-modal .modal-card p {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+#screenshot-save-modal .modal-card p + p {
+  margin-top: 10px;
+}
+
+#screenshot-save-modal .modal-actions {
+  margin-top: 18px;
+}
+
+#screenshot-save-modal .modal-actions button {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
 }
