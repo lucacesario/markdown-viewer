@@ -97,6 +97,41 @@
 
   <div id="tab-bar"></div>
 
+  <!-- Quick Open -->
+  <div id="quick-open-modal"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Quick Open"
+      aria-hidden="true">
+
+    <div class="quick-open-card">
+      <div class="quick-open-search">
+        <svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.8"
+            aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="m16 16 5 5"/>
+        </svg>
+
+        <input id="quick-open-input"
+              type="text"
+              placeholder="Search files or commands..."
+              autocomplete="off"
+              spellcheck="false">
+      </div>
+
+      <div id="quick-open-results"
+          class="quick-open-results"></div>
+
+      <div class="quick-open-footer">
+        <span>↑ ↓ Navigate</span>
+        <span>Enter Select</span>
+        <span>Esc Close</span>
+      </div>
+    </div>
+  </div>
+
   <div id="find-bar">
     <input id="find-input" type="text" placeholder="Find..." spellcheck="false">
     <span id="find-count"></span>

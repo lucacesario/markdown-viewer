@@ -968,6 +968,310 @@ function showRecentPanel() {
   panel.classList.add('visible');
 }
 
+/* ============================================
+   Quick Open — Files and Commands
+   ============================================ */
+
+var quickOpenItems = [];
+var quickOpenSelected = 0;
+var quickOpenPreviousFocus = null;
+
+var quickOpenCommands = [
+  {
+    label: 'New Document',
+    description: 'Create a new Markdown tab',
+    keywords: 'new document tab',
+    run: function() {
+      TabManager.createTab(null, '', 'edit', 'Untitled', false);
+    }
+  },
+  {
+    label: 'Open File...',
+    description: 'Choose a file from your computer',
+    keywords: 'open browse file',
+    run: function() {
+      sendToRust('open_file');
+    }
+  },
+  {
+    label: 'Save Document',
+    description: 'Save the active document',
+    keywords: 'save write',
+    run: function() {
+      doSave();
+    }
+  },
+  {
+    label: 'Save As...',
+    description: 'Choose a filename and location',
+    keywords: 'save as rename location',
+    run: function() {
+      sendToRust('save_as', {
+        content: document.getElementById('editor').value
+      });
+    }
+  },
+  {
+    label: 'Toggle Preview',
+    description: 'Switch between editing and reading',
+    keywords: 'preview edit read',
+    run: function() {
+      toggleMode();
+    }
+  },
+  {
+    label: 'Toggle Split View',
+    description: 'Show editor and preview together',
+    keywords: 'split view side by side',
+    run: function() {
+      toggleSplit();
+    }
+  },
+  {
+    label: 'Markdown Guide',
+    description: 'Open the Markdown reference guide',
+    keywords: 'guide help markdown',
+    run: function() {
+      openMarkdownGuide();
+    }
+  },
+  {
+    label: 'Export PDF',
+    description: 'Open PDF export options',
+    keywords: 'pdf export print',
+    run: function() {
+      openPdfOptions();
+    }
+  },
+  {
+    label: 'Find in Document',
+    description: 'Search the current Markdown document',
+    keywords: 'find search text',
+    run: function() {
+      openFind();
+    }
+  },
+  {
+    label: 'Table of Contents',
+    description: 'Toggle the document outline',
+    keywords: 'toc outline headings',
+    run: function() {
+      toggleTOC();
+    }
+  }
+];
+
+function isQuickOpenVisible() {
+  var modal = document.getElementById('quick-open-modal');
+  return !!modal && modal.classList.contains('visible');
+}
+
+function openQuickOpen() {
+  var modal = document.getElementById('quick-open-modal');
+  var input = document.getElementById('quick-open-input');
+
+  if (isQuickOpenVisible()) return;
+
+  quickOpenPreviousFocus = document.activeElement;
+
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+
+  input.value = '';
+  quickOpenSelected = 0;
+
+  renderQuickOpen();
+  input.focus();
+}
+
+function closeQuickOpen() {
+  var modal = document.getElementById('quick-open-modal');
+
+  if (!isQuickOpenVisible()) return;
+
+  var target = quickOpenPreviousFocus;
+  quickOpenPreviousFocus = null;
+
+  // Restore focus before marking the modal hidden.
+  if (target && target.isConnected &&
+      typeof target.focus === 'function') {
+    target.focus();
+  } else {
+    document.getElementById('editor').focus();
+  }
+
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function renderQuickOpen() {
+  var input = document.getElementById('quick-open-input');
+  var results = document.getElementById('quick-open-results');
+  var query = input.value.trim().toLowerCase();
+
+  var commands = quickOpenCommands
+    .filter(function(command) {
+      return (
+        command.label.toLowerCase().includes(query) ||
+        command.description.toLowerCase().includes(query) ||
+        command.keywords.toLowerCase().includes(query)
+      );
+    })
+    .map(function(command) {
+      return {
+        type: 'command',
+        label: command.label,
+        description: command.description,
+        run: command.run
+      };
+    });
+
+  var files = getRecentFiles()
+    .filter(function(file) {
+      return (
+        String(file.filename || '').toLowerCase().includes(query) ||
+        String(file.path || '').toLowerCase().includes(query)
+      );
+    })
+    .map(function(file) {
+      return {
+        type: 'file',
+        label: file.filename || file.path,
+        description: file.path,
+        path: file.path
+      };
+    });
+
+  // Commands first, recent files second.
+  quickOpenItems = commands.concat(files);
+
+  results.replaceChildren();
+
+  if (!quickOpenItems.length) {
+    var empty = document.createElement('div');
+    empty.className = 'quick-open-empty';
+    empty.textContent = 'No matching files or commands';
+    results.appendChild(empty);
+    quickOpenSelected = -1;
+    return;
+  }
+
+  quickOpenSelected = Math.max(
+    0,
+    Math.min(quickOpenSelected, quickOpenItems.length - 1)
+  );
+
+  quickOpenItems.forEach(function(entry, index) {
+    var item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'quick-open-item';
+
+    if (index === quickOpenSelected) {
+      item.classList.add('selected');
+    }
+
+    var name = document.createElement('span');
+    name.className = 'quick-open-filename';
+    name.textContent = entry.label;
+
+    var description = document.createElement('span');
+    description.className = 'quick-open-path';
+    description.textContent = entry.description;
+
+    item.appendChild(name);
+    item.appendChild(description);
+
+    item.addEventListener('mouseenter', function() {
+      quickOpenSelected = index;
+      updateQuickOpenSelection();
+    });
+
+    item.addEventListener('click', function() {
+      activateQuickOpenItem(index);
+    });
+
+    results.appendChild(item);
+  });
+}
+
+function updateQuickOpenSelection() {
+  var items = document.querySelectorAll('.quick-open-item');
+
+  items.forEach(function(item, index) {
+    item.classList.toggle(
+      'selected',
+      index === quickOpenSelected
+    );
+  });
+
+  if (items[quickOpenSelected]) {
+    items[quickOpenSelected].scrollIntoView({
+      block: 'nearest'
+    });
+  }
+}
+
+function activateQuickOpenItem(index) {
+  var entry = quickOpenItems[index];
+
+  if (!entry) return;
+
+  closeQuickOpen();
+
+  if (entry.type === 'command') {
+    entry.run();
+  } else if (entry.type === 'file' && entry.path) {
+    sendToRust('open_file', {
+      path: entry.path
+    });
+  }
+}
+
+document.getElementById('quick-open-input')
+  .addEventListener('input', function() {
+    quickOpenSelected = 0;
+    renderQuickOpen();
+  });
+
+document.getElementById('quick-open-input')
+  .addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (quickOpenItems.length) {
+        quickOpenSelected =
+          (quickOpenSelected + 1) % quickOpenItems.length;
+        updateQuickOpenSelection();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (quickOpenItems.length) {
+        quickOpenSelected =
+          (quickOpenSelected - 1 + quickOpenItems.length) %
+          quickOpenItems.length;
+        updateQuickOpenSelection();
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      activateQuickOpenItem(quickOpenSelected);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeQuickOpen();
+    }
+  });
+
+document.getElementById('quick-open-modal')
+  .addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeQuickOpen();
+    }
+  });
+
 // Table of Contents
 var tocOpen = false;
 
@@ -2103,6 +2407,29 @@ function prevGuideSearchMatch() {
 // Keyboard Shortcuts
 document.addEventListener('keydown', function(e) {
   var key = e.key.toLowerCase();
+
+  // Ctrl+Shift+P = Quick Open
+  if (e.ctrlKey && e.shiftKey && key === 'p') {
+    e.preventDefault();
+
+    if (isQuickOpenVisible()) {
+      closeQuickOpen();
+    } else {
+      openQuickOpen();
+    }
+
+    return;
+  }
+
+  // While Quick Open is open, prevent other shortcuts.
+  if (isQuickOpenVisible()) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeQuickOpen();
+    }
+    return;
+  }
+
 
   // Ctrl+G = open Markdown Guide
   // If already open, focus the Guide search box

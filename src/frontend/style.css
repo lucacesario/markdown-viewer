@@ -1826,3 +1826,120 @@ mark.find-match.find-active {
   font-size: 13px;
   font-weight: 400;
 }
+
+
+/* ============================================
+   QUICK OPEN
+   ============================================ */
+
+.quick-open-card {
+  width: 520px;
+  max-width: calc(100vw - 40px);
+  max-height: min(480px, calc(100vh - 80px));
+
+  display: flex;
+  flex-direction: column;
+
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+
+  overflow: hidden;
+}
+
+.quick-open-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.quick-open-search svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+#quick-open-input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+
+  background: transparent;
+  border: none;
+  outline: none;
+
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+#quick-open-input::placeholder {
+  color: var(--text-dim);
+}
+
+.quick-open-results {
+  min-height: 72px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.quick-open-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  width: 100%;
+  padding: 10px 12px;
+
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.quick-open-item:hover,
+.quick-open-item.selected {
+  background: var(--bg-raised);
+}
+
+.quick-open-item.selected {
+  outline: 1px solid var(--border);
+}
+
+.quick-open-filename {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.quick-open-path {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-open-empty {
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.quick-open-footer {
+  display: flex;
+  gap: 20px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 10.5px;
+}
