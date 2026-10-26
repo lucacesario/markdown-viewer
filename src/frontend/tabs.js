@@ -165,6 +165,14 @@ var TabManager = (function() {
 
       restoreCodeCopyIcons(document.getElementById('preview'));
 
+      if (typeof renderAllDiagrams === 'function') {
+        renderAllDiagrams(document.getElementById('preview'));
+      }
+
+      if (typeof resolveLocalImages === 'function') {
+        resolveLocalImages();
+      }
+
       if (typeof resolveLocalImages === 'function') resolveLocalImages();
     } else {
       if (tab.mode !== currentMode) {
@@ -184,12 +192,19 @@ var TabManager = (function() {
           tab.parsedHtml = html;
         }
 
-        restoreCodeCopyIcons(document.getElementById('preview'));
+      restoreCodeCopyIcons(document.getElementById('preview'));
 
-        if (typeof resolveLocalImages === 'function') resolveLocalImages();
-        setTimeout(function() {
-          document.getElementById('preview-container').scrollTop = tab.scrollTop;
-        }, 0);
+      if (typeof renderAllDiagrams === 'function') {
+        renderAllDiagrams(document.getElementById('preview'));
+      }
+
+      if (typeof resolveLocalImages === 'function') {
+        resolveLocalImages();
+      }
+
+      setTimeout(function() {
+        document.getElementById('preview-container').scrollTop = tab.scrollTop;
+      }, 0);
       }
     }
 

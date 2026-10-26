@@ -1943,3 +1943,171 @@ mark.find-match.find-active {
   color: var(--text-dim);
   font-size: 10.5px;
 }
+
+
+/* ============================================
+   MERMAID DIAGRAMS
+   ============================================ */
+
+#preview .mermaid-diagram {
+  margin: 20px 0;
+  padding: 18px;
+
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+#preview .mermaid-diagram svg {
+  display: block;
+  max-width: none;
+  height: auto;
+  margin: 0 auto;
+
+  /* Use the same zoom variable as Markdown Viewer. */
+  zoom: var(--zoom);
+}
+
+#preview .mermaid-diagram.mermaid-error {
+  color: var(--danger);
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+/* ============================================
+   OFFLINE GEOGRAPHIC DIAGRAMS
+   ============================================ */
+
+#preview .geo-diagram {
+  margin: 20px 0;
+  padding: 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+  text-align: center;
+}
+
+#preview .geo-diagram svg {
+  display: block;
+  width: min(100%, 640px);
+  height: auto;
+  margin: 0 auto;
+  zoom: var(--zoom);
+}
+
+#preview .geo-area {
+  fill: var(--accent-glow);
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+#preview .geo-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+#preview .geo-point {
+  fill: var(--accent);
+  stroke: var(--bg-base);
+  stroke-width: 1.5;
+}
+
+#preview .geo-diagram.geo-error {
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+
+/* ============================================
+   OFFLINE ASCII STL VIEWER
+   ============================================ */
+
+#preview .stl-diagram {
+  margin: 20px 0;
+  padding: 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+  text-align: center;
+}
+
+#preview .stl-diagram canvas {
+  display: block;
+  width: min(100%, 640px);
+  height: auto;
+  margin: 0 auto;
+  zoom: var(--zoom);
+
+  cursor: grab;
+  touch-action: none;
+  border-radius: 6px;
+}
+
+#preview .stl-diagram canvas:active {
+  cursor: grabbing;
+}
+
+#preview .stl-controls {
+  margin-top: 8px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+#preview .stl-diagram.stl-error {
+  color: var(--danger);
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+
+/* ============================================
+   PDF diagram page-break protection
+   ============================================ */
+
+@media print {
+  #preview .mermaid-diagram,
+  #preview .geo-diagram,
+  #preview .stl-diagram {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  #preview .stl-controls {
+    display: none;
+  }
+
+  #preview h1,
+  #preview h2,
+  #preview h3,
+  #preview h4,
+  #preview h5,
+  #preview h6 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  #preview .mermaid-diagram svg,
+  #preview .geo-diagram svg,
+  #preview .stl-diagram canvas {
+    max-width: 100%;
+    zoom: 1;
+  }
+}

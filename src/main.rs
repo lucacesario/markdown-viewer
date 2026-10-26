@@ -30,6 +30,9 @@ const TABS_JS: &str = include_str!("frontend/tabs.js");
 const MARKED_JS: &str = include_str!("frontend/marked.min.js");
 const HLJS: &str = include_str!("frontend/highlight.min.js");
 const DOMPURIFY_JS: &str = include_str!("frontend/vendor/purify.min.js");
+const MERMAID_JS: &str = include_str!("frontend/vendor/mermaid/mermaid.min.js");
+const GEO_JS: &str = include_str!("frontend/vendor/geo/geo.min.js");
+const STL_JS: &str = include_str!("frontend/stl.js");
 
 #[derive(Debug)]
 enum UserEvent {
@@ -336,8 +339,16 @@ fn build_html() -> String {
 
     let guide_json = serde_json::to_string(GUIDE_MD).unwrap_or_else(|_| "\"\"".to_string());
 
+    let scripts_with_diagrams = format!(
+        "<script>{}</script>\n<script>{}</script>\n<script>{}</script>\n{}",
+        escape_for_script_tag(MERMAID_JS),
+        escape_for_script_tag(GEO_JS),
+        escape_for_script_tag(STL_JS),
+        scripts
+    );
+
     INDEX_HTML
         .replace("/* __CSS__ */", STYLE_CSS)
         .replace("\"__GUIDE_MD__\"", &guide_json)
-        .replace("<!-- __SCRIPTS__ -->", &scripts)
+        .replace("<!-- __SCRIPTS__ -->", &scripts_with_diagrams)
 }

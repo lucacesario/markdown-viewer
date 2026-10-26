@@ -279,6 +279,7 @@ function toggleMode() {
       if (tab) tab.parsedHtml = html;
     }
     restoreCodeCopyIcons(previewEl);
+    renderAllDiagrams(previewEl);
     resolveLocalImages();
     ($.editorContainer || document.getElementById('editor-container')).classList.remove('active');
     ($.previewContainer || document.getElementById('preview-container')).classList.add('active');
@@ -369,6 +370,7 @@ function toggleSplit() {
       if (splitTab) splitTab.parsedHtml = splitHtml;
     }
     restoreCodeCopyIcons(splitPreviewEl);
+    renderAllDiagrams(splitPreviewEl);
     resolveLocalImages();
     currentMode = 'edit';
     document.getElementById('btn-toggle').classList.remove('active');
@@ -423,6 +425,7 @@ function updateSplitPreview() {
 
       preview.innerHTML = html;
       restoreCodeCopyIcons(preview);
+      renderAllDiagrams(preview);
 
       if (tab) {
         tab.parsedHtml = html;
@@ -2116,6 +2119,42 @@ function setPdfPageStyle(options) {
     '}';
 }
 
+function waitForPdfDiagrams(preview) {
+  return new Promise(function(resolve, reject) {
+    var started = Date.now();
+    var timeout = 10000;
+
+    function check() {
+      var diagrams = preview.querySelectorAll(
+        '.mermaid-diagram'
+      );
+
+      var pending = Array.from(diagrams).some(function(diagram) {
+        return (
+          !diagram.querySelector('svg') &&
+          !diagram.classList.contains('mermaid-error')
+        );
+      });
+
+      if (!pending) {
+        resolve();
+        return;
+      }
+
+      if (Date.now() - started > timeout) {
+        reject(new Error(
+          'Mermaid diagrams did not finish rendering.'
+        ));
+        return;
+      }
+
+      setTimeout(check, 50);
+    }
+
+    check();
+  });
+}
+
 function exportPdf(options) {
   options = options || {
     color: 'blue',
@@ -2139,6 +2178,9 @@ function exportPdf(options) {
   var html = renderMarkdownSafe(editor.value);
   preview.innerHTML = html;
   restoreCodeCopyIcons(preview);
+
+  // Convert diagram code blocks before exporting.
+  renderAllDiagrams(preview);
 
   var tab = TabManager.getActiveTab();
 
@@ -2180,15 +2222,31 @@ function exportPdf(options) {
     showPages: options.showPages !== false
   });
 
-  setTimeout(function() {
-    sendToRust('export_pdf');
 
+  waitForPdfDiagrams(preview).then(function() {
+    // Give WebView2 time to complete its layout
+    // before capturing the print document.
     setTimeout(function() {
-      pdfExportInProgress = false;
-    }, 1500);
+      sendToRust('export_pdf');
 
-  }, 250);
-};
+      setTimeout(function() {
+        pdfExportInProgress = false;
+      }, 1500);
+
+    }, 250);
+
+  }).catch(function(error) {
+    pdfExportInProgress = false;
+
+    document.body.classList.remove(
+      'pdf-export',
+      'pdf-paper',
+      'pdf-black'
+    );
+
+    showError('PDF export: ' + error.message);
+});
+}
 
 function bindPdfOptionsUi() {
   var cancelButton = document.getElementById('pdf-cancel');

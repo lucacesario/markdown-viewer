@@ -281,3 +281,349 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+
+/* ============================================
+   Offline Mermaid diagram rendering
+   ============================================ */
+
+var mermaidDiagramCounter = 0;
+var mermaidRendererInitialized = false;
+
+function renderMermaidDiagrams(container) {
+  if (!container) return;
+
+  var wrapper = window.__esbuild_esm_mermaid_nm;
+  var mermaid = wrapper &&
+    wrapper.mermaid &&
+    wrapper.mermaid.default;
+
+  if (!mermaid || typeof mermaid.render !== 'function') {
+    console.warn('Offline Mermaid renderer unavailable');
+    return;
+  }
+
+  if (!mermaidRendererInitialized) {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      htmlLabels: false,
+      theme: 'default'
+    });
+
+    mermaidRendererInitialized = true;
+  }
+
+  var blocks = container.querySelectorAll('pre');
+
+  blocks.forEach(function(pre) {
+    var code = pre.querySelector('code');
+
+    if (!code) return;
+
+    var language = Array.from(code.classList).some(
+      function(cls) {
+        return cls.toLowerCase() === 'language-mermaid';
+      }
+    );
+
+    if (!language) return;
+
+    // Preserve the original source for rendering.
+    var source = code.textContent.trim();
+
+    if (!source) return;
+
+    var diagram = document.createElement('div');
+    diagram.className = 'mermaid-diagram';
+    diagram.textContent = 'Rendering diagram...';
+
+    // Replace only Mermaid blocks, not ordinary code.
+    pre.replaceWith(diagram);
+
+    var id = 'markdown-mermaid-' +
+      (++mermaidDiagramCounter);
+
+    mermaid.parse(source, { suppressErrors: true })
+      .then(function(parsed) {
+        // The user may have switched tabs or edited the document.
+        if (!diagram.isConnected) return null;
+
+        // Invalid syntax should never reach Mermaid's SVG renderer.
+        if (!parsed) {
+          throw new Error('Invalid Mermaid syntax. Check the diagram code.');
+        }
+
+        return mermaid.render(id, source);
+      })
+      .then(function(result) {
+        if (!result || !diagram.isConnected) return;
+
+        var safeSvg = DOMPurify.sanitize(result.svg, {
+          USE_PROFILES: {
+            svg: true,
+            svgFilters: true
+          }
+        });
+
+        if (!safeSvg.trim()) {
+          throw new Error('Diagram SVG was empty after sanitizing.');
+        }
+
+        diagram.innerHTML = safeSvg;
+
+        // Do not bind Mermaid-generated links or click handlers.
+      })
+      .catch(function(error) {
+        if (!diagram.isConnected) return;
+
+        diagram.classList.add('mermaid-error');
+        diagram.textContent =
+          'Unable to render Mermaid diagram: ' +
+          (error.message || String(error));
+
+        console.warn('Mermaid error:', error);
+      });
+  });
+}
+
+
+/*
+ * Limit geographic data complexity before converting
+ * TopoJSON or generating SVG paths.
+ */
+function validateGeoComplexity(data, isTopoJSON) {
+  var MAX_POSITIONS = 30000;
+  var MAX_DEPTH = 32;
+  var positions = 0;
+
+  var stack = [{
+    value: isTopoJSON ? data.arcs : data,
+    depth: 0
+  }];
+
+  if (isTopoJSON && !Array.isArray(data.arcs)) {
+    throw new Error('TopoJSON must contain an arcs array.');
+  }
+
+  while (stack.length > 0) {
+    var item = stack.pop();
+    var value = item.value;
+
+    if (item.depth > MAX_DEPTH) {
+      throw new Error('Geographic data is nested too deeply.');
+    }
+
+    if (!value || typeof value !== 'object') {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      // A geographic position contains at least two numbers.
+      if (
+        value.length >= 2 &&
+        typeof value[0] === 'number' &&
+        typeof value[1] === 'number'
+      ) {
+        if (!Number.isFinite(value[0]) ||
+            !Number.isFinite(value[1])) {
+          throw new Error('Invalid geographic coordinates.');
+        }
+
+        positions++;
+
+        if (positions > MAX_POSITIONS) {
+          throw new Error(
+            'Geographic data exceeds the ' +
+            MAX_POSITIONS + '-position limit.'
+          );
+        }
+
+        continue;
+      }
+
+      for (var i = 0; i < value.length; i++) {
+        stack.push({
+          value: value[i],
+          depth: item.depth + 1
+        });
+      }
+    } else if (!isTopoJSON) {
+      // Traverse only GeoJSON geometry-related fields.
+      ['features', 'geometry', 'geometries', 'coordinates']
+        .forEach(function(key) {
+          if (value[key] != null) {
+            stack.push({
+              value: value[key],
+              depth: item.depth + 1
+            });
+          }
+        });
+    }
+  }
+}
+
+/* ============================================
+   Offline GeoJSON and TopoJSON rendering
+   ============================================ */
+
+function renderGeoDiagrams(container) {
+  if (!container || !window.MarkdownGeo) return;
+
+  var geo = window.MarkdownGeo;
+  var svgNS = 'http://www.w3.org/2000/svg';
+
+  container.querySelectorAll('pre').forEach(function(pre) {
+    var code = pre.querySelector('code');
+    if (!code) return;
+
+    var isGeoJSON = code.classList.contains('language-geojson');
+    var isTopoJSON = code.classList.contains('language-topojson');
+
+    if (!isGeoJSON && !isTopoJSON) return;
+
+    var source = code.textContent.trim();
+    var panel = document.createElement('div');
+    panel.className = 'geo-diagram';
+    pre.replaceWith(panel);
+
+    function showError(message) {
+      panel.classList.add('geo-error');
+      panel.textContent = 'Unable to render geographic data: ' + message;
+    }
+
+    try {
+      // Avoid processing very large, untrusted documents.
+      if (source.length > 2_000_000) {
+        throw new Error('Data exceeds the 2 MB text limit.');
+      }
+
+      var data = JSON.parse(source);
+      var features;
+
+      // Reject excessive geometry before projection or conversion.
+      validateGeoComplexity(data, isTopoJSON);
+
+      if (isTopoJSON) {
+        if (
+          !data ||
+          data.type !== 'Topology' ||
+          !data.objects ||
+          typeof data.objects !== 'object'
+        ) {
+          throw new Error('Expected a TopoJSON Topology object.');
+        }
+
+        features = [];
+
+        Object.keys(data.objects).forEach(function(key) {
+          var converted = geo.topojsonFeature(
+            data,
+            data.objects[key]
+          );
+
+          if (converted.type === 'FeatureCollection') {
+            features.push.apply(features, converted.features);
+          } else {
+            features.push(converted);
+          }
+        });
+      } else {
+        if (!data || typeof data.type !== 'string') {
+          throw new Error('Expected a GeoJSON object with a type.');
+        }
+
+        if (data.type === 'FeatureCollection') {
+          features = data.features;
+        } else if (data.type === 'Feature') {
+          features = [data];
+        } else {
+          features = [{
+            type: 'Feature',
+            geometry: data,
+            properties: {}
+          }];
+        }
+      }
+
+      if (!Array.isArray(features) || !features.length) {
+        throw new Error('No geographic features found.');
+      }
+
+      if (features.length > 5000) {
+        throw new Error('Too many features (maximum 5000).');
+      }
+
+      var collection = {
+        type: 'FeatureCollection',
+        features: features
+      };
+
+      var width = 640;
+      var height = 400;
+
+      var projection = geo.geoMercator();
+
+      projection.fitExtent(
+        [[24, 24], [width - 24, height - 24]],
+        collection
+      );
+
+      var path = geo.geoPath(projection).pointRadius(5);
+
+      var svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+      svg.setAttribute('width', String(width));
+      svg.setAttribute('height', String(height));
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label',
+        isTopoJSON ? 'TopoJSON map' : 'GeoJSON map');
+
+      features.forEach(function(feature) {
+        if (!feature || !feature.geometry) return;
+
+        var geometryType = feature.geometry.type;
+        var pathData = path(feature);
+
+        if (!pathData) return;
+
+        var shape = document.createElementNS(svgNS, 'path');
+        shape.setAttribute('d', pathData);
+
+        if (
+          geometryType === 'Point' ||
+          geometryType === 'MultiPoint'
+        ) {
+          shape.setAttribute('class', 'geo-point');
+        } else if (
+          geometryType === 'LineString' ||
+          geometryType === 'MultiLineString'
+        ) {
+          shape.setAttribute('class', 'geo-line');
+        } else {
+          shape.setAttribute('class', 'geo-area');
+        }
+
+        svg.appendChild(shape);
+      });
+
+      if (!svg.childNodes.length) {
+        throw new Error('No drawable geometry found.');
+      }
+
+      panel.appendChild(svg);
+
+    } catch (error) {
+      showError(error.message || String(error));
+      console.warn('Geo diagram error:', error);
+    }
+  });
+}
+
+/* Render all supported offline diagram formats. */
+function renderAllDiagrams(container) {
+  if (!container) return;
+
+  renderMermaidDiagrams(container);
+  renderGeoDiagrams(container);
+  renderStlDiagrams(container);
+}
