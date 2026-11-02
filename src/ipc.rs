@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Deserialize;
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tao::window::Window;
@@ -26,6 +26,8 @@ struct IpcMessage {
     content: Option<String>,
     #[serde(default)]
     path: Option<String>,
+    #[serde(default)]
+    request_id: Option<u64>,
     #[serde(default)]
     title: Option<String>,
 }
@@ -111,6 +113,38 @@ pub fn handle_ipc_message(
                             "message": format!("Failed to open file: {e}")
                         }),
                     ),
+                }
+            }
+        }
+        "check_file_change" => {
+            if let Some(path) = parsed.path.as_deref() {
+                match read_live_file(path) {
+                    Ok(content) => {
+                        send_to_js(
+                            webview,
+                            "file_check_result",
+                            &serde_json::json!({
+                                "path": path,
+                                "content": content,
+                                "ok": true,
+                                "request_id": parsed.request_id,
+                            }),
+                        );
+                    }
+                    Err(message) => {
+                        // Send the failure to Live Read rather than
+                        // showing a global error on every poll.
+                        send_to_js(
+                            webview,
+                            "file_check_result",
+                            &serde_json::json!({
+                                "path": path,
+                                "ok": false,
+                                "message": message,
+                                "request_id": parsed.request_id,
+                            }),
+                        );
+                    }
                 }
             }
         }
@@ -340,6 +374,46 @@ fn handle_save_as(webview: &WebView, window: &Window, content: Option<String>) {
             }
         }
     }
+}
+
+/*
+ * Live Read: read a file without modifying it.
+ *
+ * Limit reads to 4 MiB so polling cannot accidentally
+ * load very large documents into the WebView.
+ */
+fn read_live_file(path: &str) -> Result<String, String> {
+    const MAX_FILE_BYTES: u64 = 4 * 1024 * 1024;
+
+    let file = fs::File::open(path)
+        .map_err(|e| format!("Cannot read file: {e}"))?;
+
+    let metadata = file
+        .metadata()
+        .map_err(|e| format!("Cannot inspect file: {e}"))?;
+
+    if !metadata.is_file() {
+        return Err("Path is not a regular file.".to_string());
+    }
+
+    if metadata.len() > MAX_FILE_BYTES {
+        return Err("File exceeds the 4 MiB Live Read limit.".to_string());
+    }
+
+    // Bounded read also protects against files growing
+    // between metadata inspection and reading.
+    let mut bytes = Vec::new();
+
+    file.take(MAX_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("Cannot read file: {e}"))?;
+
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err("File exceeds the 4 MiB Live Read limit.".to_string());
+    }
+
+    String::from_utf8(bytes)
+        .map_err(|_| "Live Read requires a UTF-8 text file.".to_string())
 }
 
 fn send_to_js(webview: &WebView, event: &str, data: &serde_json::Value) {

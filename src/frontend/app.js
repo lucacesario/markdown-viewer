@@ -107,6 +107,9 @@ window.__fromRust = function(event, data) {
       console.log('Screenshot saved:', data.path);
       break;
     }
+    case 'file_check_result':
+      handleLiveReadResult(data);
+      break;
     case 'file_opened':
       addRecentFile(data.path);
       TabManager.createTab(data.path, data.content);
@@ -178,6 +181,156 @@ document.addEventListener('DOMContentLoaded', function() {
 // State
 var currentMode = 'edit';
 var splitMode = false;
+
+
+/* Live Read —
+ * Watch only the active, saved document.
+ * Never replace unsaved editor changes.
+ */
+var liveReadPending = null;
+var liveReadLastCheck = 0;
+var liveReadRequestId = 0;
+
+function checkLiveRead() {
+  var tab = TabManager.getActiveTab();
+
+  if (!tab || !tab.path || tab.dirty) return;
+  if (liveReadPending) return;
+
+  var now = Date.now();
+  if (now - liveReadLastCheck < 1000) return;
+
+  liveReadLastCheck = now;
+  var requestId = ++liveReadRequestId;
+
+  liveReadPending = {
+    tabId: tab.id,
+    path: tab.path,
+    started: now,
+    requestId: requestId
+  };
+
+  sendToRust('check_file_change', {
+    path: tab.path,
+    request_id: requestId
+  });
+}
+
+function handleLiveReadResult(data) {
+  var pending = liveReadPending;
+
+  // Ignore manual, outdated or unrelated IPC responses.
+  if (!pending || !data ||
+      data.request_id !== pending.requestId) {
+    return;
+  }
+
+  liveReadPending = null;
+  var tab = TabManager.getActiveTab();
+
+  // Ignore responses for a document that is no longer active.
+  if (!tab ||
+      tab.id !== pending.tabId ||
+      tab.path !== pending.path ||
+      data.path !== pending.path) {
+    return;
+  }
+
+  if (!data.ok) {
+    // Temporary missing/locked files must not clear the editor.
+    console.warn('Live Read:', data.message);
+    return;
+  }
+
+  // Protect local edits, including changes made while Rust was reading.
+  if (tab.dirty) return;
+
+  var editor = document.getElementById('editor');
+
+  var newContent = data.content;
+  if (typeof newContent !== 'string') return;
+  if (newContent === editor.value) return;
+
+  var preview = document.getElementById('preview');
+  var previewContainer =
+    document.getElementById('preview-container');
+
+  var maxScroll =
+    previewContainer.scrollHeight - previewContainer.clientHeight;
+
+  var scrollRatio = maxScroll > 0
+    ? previewContainer.scrollTop / maxScroll
+    : 0;
+
+  var editorScroll = editor.scrollTop;
+  var cursorStart = editor.selectionStart;
+  var cursorEnd = editor.selectionEnd;
+
+  // Update the existing tab, not a new tab.
+  tab.content = newContent;
+  tab.parsedHtml = null;
+  editor.value = newContent;
+
+  // Preserve editor position within the new document length.
+  editor.selectionStart =
+    Math.min(cursorStart, newContent.length);
+  editor.selectionEnd =
+    Math.min(cursorEnd, newContent.length);
+
+  editor.scrollTop = editorScroll;
+
+  // Rebuild the preview only when it is visible.
+  if (splitMode || currentMode === 'preview') {
+    var html = renderMarkdownSafe(newContent);
+
+    tab.parsedHtml = html;
+    preview.innerHTML = html;
+
+    restoreCodeCopyIcons(preview);
+    renderAllDiagrams(preview);
+    resolveLocalImages();
+
+    requestAnimationFrame(function() {
+      var currentTab = TabManager.getActiveTab();
+      if (!currentTab || currentTab.id !== pending.tabId) return;
+
+      var newMaxScroll =
+        previewContainer.scrollHeight -
+        previewContainer.clientHeight;
+
+      previewContainer.scrollTop =
+        scrollRatio * Math.max(0, newMaxScroll);
+
+      updateReadingIndicators();
+    });
+  }
+
+  if (typeof updateLineNumbers === 'function') {
+    updateLineNumbers();
+  }
+
+  if (typeof updateWordCount === 'function') {
+    updateWordCount();
+  }
+
+  if (typeof tocOpen !== 'undefined' &&
+      tocOpen &&
+      typeof updateTOC === 'function') {
+    updateTOC();
+  }
+
+  console.log('Live Read: refreshed', tab.path);
+}
+
+// Poll only the active file; no folder watching.
+setInterval(function() {
+  if (liveReadPending &&
+      Date.now() - liveReadPending.started > 5000) {
+    liveReadPending = null;
+  }
+
+  checkLiveRead();
+}, 1000);
 
 // Cross-mode selection helpers
 function selectInPreview(text, ratio) {
