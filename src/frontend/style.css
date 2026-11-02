@@ -767,6 +767,40 @@ body.preview-resizing #preview {
   gap: 10px;
   font-family: var(--font-body);
 }
+
+/* Live Read status-bar toggle */
+#btn-live-read {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#btn-live-read:hover {
+  color: var(--text);
+  background: var(--bg-raised);
+}
+
+#btn-live-read.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.live-read-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 #status-mode {
   color: var(--accent);
   font-weight: 600;

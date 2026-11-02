@@ -191,7 +191,54 @@ var liveReadPending = null;
 var liveReadLastCheck = 0;
 var liveReadRequestId = 0;
 
+/* Live Read user preference */
+var liveReadEnabled = true;
+
+try {
+  liveReadEnabled =
+    localStorage.getItem('markdown-viewer-live-read') !== 'off';
+} catch (error) {
+  // Keep Live Read enabled if storage is unavailable.
+}
+
+function updateLiveReadButton() {
+  var button = document.getElementById('btn-live-read');
+  var label = document.getElementById('live-read-label');
+
+  if (!button || !label) return;
+
+  button.classList.toggle('active', liveReadEnabled);
+  button.setAttribute('aria-pressed', String(liveReadEnabled));
+  button.title = liveReadEnabled
+    ? 'Pause Live Read'
+    : 'Resume Live Read';
+
+  label.textContent = liveReadEnabled ? 'LIVE ON' : 'LIVE OFF';
+}
+
+function toggleLiveRead() {
+  liveReadEnabled = !liveReadEnabled;
+
+  try {
+    localStorage.setItem(
+      'markdown-viewer-live-read',
+      liveReadEnabled ? 'on' : 'off'
+    );
+  } catch (error) {
+    console.warn('Unable to save Live Read preference:', error);
+  }
+
+  updateLiveReadButton();
+
+  if (liveReadEnabled) {
+    liveReadLastCheck = 0;
+    checkLiveRead();
+  }
+}
+
 function checkLiveRead() {
+  if (!liveReadEnabled) return;
+
   var tab = TabManager.getActiveTab();
 
   if (!tab || !tab.path || tab.dirty) return;
@@ -226,6 +273,8 @@ function handleLiveReadResult(data) {
   }
 
   liveReadPending = null;
+  if (!liveReadEnabled) return;
+
   var tab = TabManager.getActiveTab();
 
   // Ignore responses for a document that is no longer active.
@@ -3031,3 +3080,8 @@ document.addEventListener('DOMContentLoaded', function() {
   sendToRust('ready');
 });
 
+/* Live Read status-bar control */
+document.getElementById('btn-live-read')
+  .addEventListener('click', toggleLiveRead);
+
+updateLiveReadButton();
