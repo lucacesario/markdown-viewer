@@ -254,6 +254,42 @@
     </div>
 </div>
 
+<div id="save-conflict-modal"
+     class="modal-backdrop"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="save-conflict-title"
+     aria-hidden="true">
+
+  <div class="modal-card">
+    <div class="modal-title" id="save-conflict-title">
+      File changed on disk
+    </div>
+
+    <div class="modal-message">
+      This document was modified outside Markdown Viewer.
+      Saving now may overwrite those changes.
+      Your unsaved edits are preserved.
+    </div>
+
+    <div class="modal-actions">
+      <button id="save-conflict-cancel" type="button">
+        Cancel
+      </button>
+
+      <button id="save-conflict-save-as" type="button">
+        Save As…
+      </button>
+
+      <button id="save-conflict-overwrite"
+              type="button"
+              class="danger">
+        Overwrite
+      </button>
+    </div>
+  </div>
+</div>
+
 <div id="close-confirm-modal" class="modal-backdrop">
   <div class="modal-card">
     <div class="modal-title">Unsaved changes</div>

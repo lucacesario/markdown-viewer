@@ -801,6 +801,20 @@ body.preview-resizing #preview {
   background: currentColor;
 }
 
+/* External file change warning */
+#live-read-warning {
+  font-size: 11px;
+  color: #b87928;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 340px;
+}
+
+#live-read-warning[hidden] {
+  display: none;
+}
+
 #status-mode {
   color: var(--accent);
   font-weight: 600;

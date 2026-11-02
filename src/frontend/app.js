@@ -110,12 +110,29 @@ window.__fromRust = function(event, data) {
     case 'file_check_result':
       handleLiveReadResult(data);
       break;
-    case 'file_opened':
+    case 'file_opened': {
       addRecentFile(data.path);
       TabManager.createTab(data.path, data.content);
+
+      var openedTab = TabManager.getActiveTab();
+      if (openedTab) {
+        openedTab.liveReadDiskContent = data.content;
+        openedTab.liveReadConflict = false;
+      }
+      break;
+    }
+    case 'save_conflict':
+      showSaveConflict(data);
       break;
     case 'file_saved':
       TabManager.markClean();
+      var savedTab = TabManager.getActiveTab();
+      if (savedTab) {
+        savedTab.liveReadDiskContent =
+          document.getElementById('editor').value;
+        savedTab.liveReadConflict = false;
+      }
+      updateLiveReadWarning();
       if (data.path) {
         TabManager.updateTabPath(null, data.path);
         addRecentFile(data.path);
@@ -216,6 +233,33 @@ function updateLiveReadButton() {
   label.textContent = liveReadEnabled ? 'LIVE ON' : 'LIVE OFF';
 }
 
+function updateLiveReadWarning() {
+  var warning = document.getElementById('live-read-warning');
+  var tab = TabManager.getActiveTab();
+
+  if (!warning) return;
+
+  warning.hidden = !(
+    tab &&
+    tab.path &&
+    tab.dirty &&
+    tab.liveReadConflict
+  );
+}
+
+// Create a warning separate from transient status messages.
+var liveReadWarning = document.createElement('span');
+liveReadWarning.id = 'live-read-warning';
+liveReadWarning.textContent =
+  '⚠ File changed on disk — unsaved edits preserved';
+liveReadWarning.title =
+  'The file changed externally. Your local edits were not replaced. ' +
+  'Saving now may overwrite the external changes.';
+liveReadWarning.hidden = true;
+
+document.getElementById('status-info')
+  .insertAdjacentElement('afterend', liveReadWarning);
+
 function toggleLiveRead() {
   liveReadEnabled = !liveReadEnabled;
 
@@ -241,7 +285,7 @@ function checkLiveRead() {
 
   var tab = TabManager.getActiveTab();
 
-  if (!tab || !tab.path || tab.dirty) return;
+  if (!tab || !tab.path) return;
   if (liveReadPending) return;
 
   var now = Date.now();
@@ -291,14 +335,31 @@ function handleLiveReadResult(data) {
     return;
   }
 
-  // Protect local edits, including changes made while Rust was reading.
-  if (tab.dirty) return;
+  // Establish the last known disk version for this tab.
+  if (typeof tab.liveReadDiskContent !== 'string') {
+    tab.liveReadDiskContent = tab.content;
+  }
+
+  // Detect external changes without replacing unsaved local edits.
+  if (tab.dirty) {
+    tab.liveReadConflict =
+      data.content !== tab.liveReadDiskContent;
+
+    updateLiveReadWarning();
+    return;
+  }
+
+  tab.liveReadConflict = false;
+  updateLiveReadWarning();
 
   var editor = document.getElementById('editor');
 
   var newContent = data.content;
   if (typeof newContent !== 'string') return;
-  if (newContent === editor.value) return;
+  if (newContent === editor.value) {
+    tab.liveReadDiskContent = newContent;
+    return;
+  }
 
   var preview = document.getElementById('preview');
   var previewContainer =
@@ -317,6 +378,8 @@ function handleLiveReadResult(data) {
 
   // Update the existing tab, not a new tab.
   tab.content = newContent;
+  tab.liveReadDiskContent = newContent;
+  tab.liveReadConflict = false;
   tab.parsedHtml = null;
   editor.value = newContent;
 
@@ -377,7 +440,7 @@ setInterval(function() {
       Date.now() - liveReadPending.started > 5000) {
     liveReadPending = null;
   }
-
+  updateLiveReadWarning();
   checkLiveRead();
 }, 1000);
 
@@ -1550,12 +1613,76 @@ function toggleTOC() {
   if (tocOpen) updateTOC();
 }
 
+var saveConflictPath = null;
+var saveConflictDiskContent = null;
+var saveConflictTabId = null;
+
+function showSaveConflict(data) {
+  var tab = TabManager.getActiveTab();
+
+  if (!tab || !data ||
+      tab.path !== data.path ||
+      typeof data.disk_content !== 'string') {
+    return;
+  }
+
+  saveConflictPath = data.path;
+  saveConflictDiskContent = data.disk_content;
+  saveConflictTabId = tab.id;
+
+  var modal = document.getElementById('save-conflict-modal');
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+
+  document.getElementById('save-conflict-cancel').focus();
+}
+
+function closeSaveConflict() {
+  saveConflictPath = null;
+  saveConflictDiskContent = null;
+  saveConflictTabId = null;
+
+  var modal = document.getElementById('save-conflict-modal');
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function getSaveConflictAction() {
+  var tab = TabManager.getActiveTab();
+
+  if (!tab ||
+      tab.id !== saveConflictTabId ||
+      tab.path !== saveConflictPath ||
+      typeof saveConflictDiskContent !== 'string') {
+    return null;
+  }
+
+  return {
+    path: saveConflictPath,
+    content: document.getElementById('editor').value,
+    expected_content: saveConflictDiskContent
+  };
+}
+
 function doSave() {
   var tab = TabManager.getActiveTab();
-  var data = { content: document.getElementById('editor').value };
-  if (tab && tab.path) data.path = tab.path;
+
+  var data = {
+    content: document.getElementById('editor').value
+  };
+
+  if (tab && tab.path) {
+    data.path = tab.path;
+
+    // Rust uses this to detect external changes before writing.
+    if (typeof tab.liveReadDiskContent === 'string') {
+      data.expected_content = tab.liveReadDiskContent;
+    }
+  }
+
   sendToRust('save_file', data);
 }
+
 
 // Zoom
 var zoomLevel = 1;
@@ -3085,3 +3212,37 @@ document.getElementById('btn-live-read')
   .addEventListener('click', toggleLiveRead);
 
 updateLiveReadButton();
+
+document.getElementById('save-conflict-cancel')
+  .addEventListener('click', closeSaveConflict);
+
+document.getElementById('save-conflict-save-as')
+  .addEventListener('click', function() {
+    var data = getSaveConflictAction();
+    if (!data) {
+      closeSaveConflict();
+      showError('The active document changed. Save As cancelled.');
+      return;
+    }
+
+    closeSaveConflict();
+
+    sendToRust('save_conflict_as', {
+      path: data.path,
+      content: data.content
+    });
+  });
+
+document.getElementById('save-conflict-overwrite')
+  .addEventListener('click', function() {
+    var data = getSaveConflictAction();
+    if (!data) {
+      closeSaveConflict();
+      showError('The active document changed. Overwrite cancelled.');
+      return;
+    }
+
+    closeSaveConflict();
+
+    sendToRust('overwrite_file', data);
+  });

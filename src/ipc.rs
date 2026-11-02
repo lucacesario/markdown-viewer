@@ -29,6 +29,8 @@ struct IpcMessage {
     #[serde(default)]
     request_id: Option<u64>,
     #[serde(default)]
+    expected_content: Option<String>,
+    #[serde(default)]
     title: Option<String>,
 }
 
@@ -151,31 +153,151 @@ pub fn handle_ipc_message(
         "save_file" => {
             if let Some(ref content) = parsed.content {
                 if let Some(ref path) = parsed.path {
-                    match file_ops::write_file(path, content) {
-                        Ok(_) => {
+                    // Existing files require a known disk baseline.
+                    let expected = match parsed.expected_content.as_deref() {
+                        Some(expected) => expected,
+                        None => {
                             send_to_js(
                                 webview,
-                                "file_saved",
+                                "error",
                                 &serde_json::json!({
-                                    "path": path
+                                    "message": "Save blocked: the original file version is unknown."
+                                }),
+                            );
+                            return;
+                        }
+                    };
+
+                    // Re-read the file at save time.
+                    match file_ops::read_file(path) {
+                        Ok(current_disk_content) => {
+                            if current_disk_content != expected {
+                                // Refuse to overwrite an externally changed file.
+                                send_to_js(
+                                    webview,
+                                    "save_conflict",
+                                    &serde_json::json!({
+                                        "path": path,
+                                        "disk_content": current_disk_content
+                                    }),
+                                );
+                                return;
+                            }
+
+                            match file_ops::write_file(path, content) {
+                                Ok(_) => {
+                                    send_to_js(
+                                        webview,
+                                        "file_saved",
+                                        &serde_json::json!({
+                                            "path": path
+                                        }),
+                                    );
+                                }
+                                Err(e) => {
+                                    send_to_js(
+                                        webview,
+                                        "error",
+                                        &serde_json::json!({
+                                            "message": format!("Failed to save: {e}")
+                                        }),
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            send_to_js(
+                                webview,
+                                "error",
+                                &serde_json::json!({
+                                    "message": format!(
+                                        "Save blocked: cannot verify the current disk file: {e}"
+                                    )
                                 }),
                             );
                         }
-                        Err(e) => send_to_js(
-                            webview,
-                            "error",
-                            &serde_json::json!({
-                                "message": format!("Failed to save: {e}")
-                            }),
-                        ),
                     }
                 } else {
-                    handle_save_as(webview, window, parsed.content);
+                    handle_save_as(webview, window, parsed.content, None);
                 }
             }
         }
+        "overwrite_file" => {
+            if let (Some(path), Some(content), Some(expected)) = (
+                parsed.path.as_deref(),
+                parsed.content.as_deref(),
+                parsed.expected_content.as_deref(),
+            ) {
+                // The user approved overwriting this specific disk version.
+                // Recheck it before writing.
+                match file_ops::read_file(path) {
+                    Ok(current) if current == expected => {
+                        match file_ops::write_file(path, content) {
+                            Ok(()) => send_to_js(
+                                webview,
+                                "file_saved",
+                                &serde_json::json!({ "path": path }),
+                            ),
+                            Err(e) => send_to_js(
+                                webview,
+                                "error",
+                                &serde_json::json!({
+                                    "message": format!("Failed to overwrite file: {e}")
+                                }),
+                            ),
+                        }
+                    }
+                    Ok(current) => {
+                        // The file changed again after the dialog opened.
+                        send_to_js(
+                            webview,
+                            "save_conflict",
+                            &serde_json::json!({
+                                "path": path,
+                                "disk_content": current
+                            }),
+                        );
+                    }
+                    Err(e) => send_to_js(
+                        webview,
+                        "error",
+                        &serde_json::json!({
+                            "message": format!(
+                                "Overwrite blocked: cannot verify disk file: {e}"
+                            )
+                        }),
+                    ),
+                }
+            } else {
+                send_to_js(
+                    webview,
+                    "error",
+                    &serde_json::json!({
+                        "message": "Overwrite blocked: missing save information."
+                    }),
+                );
+            }
+        }    
+        "save_conflict_as" => {
+            if let Some(original_path) = parsed.path.as_deref() {
+                handle_save_as(
+                    webview,
+                    window,
+                    parsed.content,
+                    Some(original_path),
+                );
+            } else {
+                send_to_js(
+                    webview,
+                    "error",
+                    &serde_json::json!({
+                        "message": "Save As blocked: original file path is missing."
+                    }),
+                );
+            }
+        }
         "save_as" => {
-            handle_save_as(webview, window, parsed.content);
+            handle_save_as(webview, window, parsed.content, None);
         }
         "set_title" => {
             if let Some(title) = parsed.title {
@@ -351,30 +473,67 @@ pub fn handle_ipc_message(
     }
 }
 
-fn handle_save_as(webview: &WebView, window: &Window, content: Option<String>) {
-    if let Some(content) = content {
-        if let Some(path) = file_ops::pick_save_file(window) {
-            match file_ops::write_file(&path, &content) {
-                Ok(_) => {
-                    send_to_js(
-                        webview,
-                        "file_saved",
-                        &serde_json::json!({
-                            "path": path
-                        }),
-                    );
-                }
-                Err(e) => send_to_js(
-                    webview,
-                    "error",
-                    &serde_json::json!({
-                        "message": format!("Failed to save: {e}")
-                    }),
-                ),
-            }
+fn handle_save_as(
+    webview: &WebView,
+    window: &Window,
+    content: Option<String>,
+    forbidden_path: Option<&str>,
+) {
+    let Some(content) = content else {
+        return;
+    };
+
+    let Some(path) = file_ops::pick_save_file(window) else {
+        // User cancelled the Windows Save As dialog.
+        return;
+    };
+
+    if let Some(original) = forbidden_path {
+        let normalized_original =
+            original.replace('\\', "/").to_lowercase();
+
+        let normalized_selected =
+            path.replace('\\', "/").to_lowercase();
+
+        let same_path = normalized_original == normalized_selected
+            || match (
+                Path::new(original).canonicalize(),
+                Path::new(&path).canonicalize(),
+            ) {
+                (Ok(a), Ok(b)) => a == b,
+                _ => false,
+            };
+
+        if same_path {
+            send_to_js(
+                webview,
+                "error",
+                &serde_json::json!({
+                    "message": "Save As cannot replace the conflicted original file. Choose a different filename."
+                }),
+            );
+            return;
         }
     }
+
+    match file_ops::write_file(&path, &content) {
+        Ok(()) => send_to_js(
+            webview,
+            "file_saved",
+            &serde_json::json!({
+                "path": path
+            }),
+        ),
+        Err(e) => send_to_js(
+            webview,
+            "error",
+            &serde_json::json!({
+                "message": format!("Failed to save: {e}")
+            }),
+        ),
+    }
 }
+
 
 /*
  * Live Read: read a file without modifying it.
