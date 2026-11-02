@@ -782,6 +782,7 @@ body.preview-resizing #preview {
   font-size: 10px;
   cursor: pointer;
   white-space: nowrap;
+  margin: 10px 10px;
 }
 
 #btn-live-read:hover {
@@ -2157,5 +2158,31 @@ mark.find-match.find-active {
   #preview .stl-diagram canvas {
     max-width: 100%;
     zoom: 1;
+  }
+}
+
+/* Temporary highlight for appended Markdown */
+#preview .live-read-new-block {
+  border-radius: 4px;
+  background-color: rgba(79, 155, 110, 0.13);
+  box-shadow: inset 3px 0 rgba(79, 155, 110, 0.75);
+  animation: live-read-highlight 3s ease-out forwards;
+}
+
+@keyframes live-read-highlight {
+  0%, 55% {
+    background-color: rgba(79, 155, 110, 0.13);
+    box-shadow: inset 3px 0 rgba(79, 155, 110, 0.75);
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: inset 3px 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #preview .live-read-new-block {
+    animation: none;
   }
 }

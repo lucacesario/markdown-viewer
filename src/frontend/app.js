@@ -361,6 +361,15 @@ function handleLiveReadResult(data) {
     return;
   }
 
+  /* detect content appended after existing Markdown. */
+  var oldContent = editor.value;
+
+  var hasAppendedBlocks =
+    oldContent.length > 0 &&
+    newContent.startsWith(oldContent) &&
+    newContent.slice(oldContent.length).trim().length > 0 &&
+    /(?:\r?\n){2}$/.test(oldContent);
+
   var preview = document.getElementById('preview');
   var previewContainer =
     document.getElementById('preview-container');
@@ -393,6 +402,7 @@ function handleLiveReadResult(data) {
 
   // Rebuild the preview only when it is visible.
   if (splitMode || currentMode === 'preview') {
+    var oldBlockCount = preview.children.length;
     var html = renderMarkdownSafe(newContent);
 
     tab.parsedHtml = html;
@@ -401,6 +411,20 @@ function handleLiveReadResult(data) {
     restoreCodeCopyIcons(preview);
     renderAllDiagrams(preview);
     resolveLocalImages();
+
+    /* Highlight newly appended top-level Markdown blocks. */
+    if (hasAppendedBlocks) {
+      var newBlocks = Array.from(preview.children)
+        .slice(oldBlockCount);
+
+      newBlocks.forEach(function(block) {
+        block.classList.add('live-read-new-block');
+
+        setTimeout(function() {
+          block.classList.remove('live-read-new-block');
+        }, 3000);
+      });
+    }
 
     requestAnimationFrame(function() {
       var currentTab = TabManager.getActiveTab();
