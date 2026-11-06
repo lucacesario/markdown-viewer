@@ -211,6 +211,48 @@ var liveReadRequestId = 0;
 /* Live Read user preference */
 var liveReadEnabled = true;
 
+
+/* Follow Mode */
+var followModeEnabled = false;
+
+try {
+  followModeEnabled =
+    localStorage.getItem('markdown-viewer-follow-mode') === 'on';
+} catch (error) {
+  // Follow Mode stays off if storage is unavailable.
+}
+
+function updateFollowButton() {
+  var button = document.getElementById('btn-follow');
+  var label = document.getElementById('follow-label');
+  if (!button || !label) return;
+
+  button.classList.toggle('active', followModeEnabled);
+  button.setAttribute('aria-pressed', String(followModeEnabled));
+  button.title = followModeEnabled
+    ? 'Disable Follow Mode'
+    : 'Enable Follow Mode';
+
+  label.textContent = followModeEnabled
+    ? 'FOLLOW ON'
+    : 'FOLLOW OFF';
+}
+
+function toggleFollowMode() {
+  followModeEnabled = !followModeEnabled;
+
+  try {
+    localStorage.setItem(
+      'markdown-viewer-follow-mode',
+      followModeEnabled ? 'on' : 'off'
+    );
+  } catch (error) {
+    console.warn('Unable to save Follow Mode preference:', error);
+  }
+
+  updateFollowButton();
+}
+
 try {
   liveReadEnabled =
     localStorage.getItem('markdown-viewer-live-read') !== 'off';
@@ -307,6 +349,22 @@ function checkLiveRead() {
   });
 }
 
+function findLiveChangePosition(oldText, newText) {
+  if (oldText === newText) return -1;
+
+  var position = 0;
+  var limit = Math.min(oldText.length, newText.length);
+
+  while (
+    position < limit &&
+    oldText.charAt(position) === newText.charAt(position)
+  ) {
+    position++;
+  }
+
+  return position;
+}
+
 function handleLiveReadResult(data) {
   var pending = liveReadPending;
 
@@ -363,12 +421,8 @@ function handleLiveReadResult(data) {
 
   /* detect content appended after existing Markdown. */
   var oldContent = editor.value;
-
-  var hasAppendedBlocks =
-    oldContent.length > 0 &&
-    newContent.startsWith(oldContent) &&
-    newContent.slice(oldContent.length).trim().length > 0 &&
-    /(?:\r?\n){2}$/.test(oldContent);
+  var liveChangePosition =
+    findLiveChangePosition(oldContent, newContent);
 
   var preview = document.getElementById('preview');
   var previewContainer =
@@ -402,8 +456,45 @@ function handleLiveReadResult(data) {
 
   // Rebuild the preview only when it is visible.
   if (splitMode || currentMode === 'preview') {
-    var oldBlockCount = preview.children.length;
+
+    // Render the previous document separately so diagram
+    // enhancements and copy buttons don't affect comparison.
+    var oldPreview = document.createElement('div');
+    oldPreview.innerHTML = renderMarkdownSafe(oldContent);
+
     var html = renderMarkdownSafe(newContent);
+
+    var newPreview = document.createElement('div');
+    newPreview.innerHTML = html;
+
+    var oldBlocks = Array.from(oldPreview.children);
+    var newBlocks = Array.from(newPreview.children);
+
+    // Find unchanged blocks at the beginning.
+    var firstChanged = 0;
+
+    while (
+      firstChanged < oldBlocks.length &&
+      firstChanged < newBlocks.length &&
+      oldBlocks[firstChanged].outerHTML ===
+        newBlocks[firstChanged].outerHTML
+    ) {
+      firstChanged++;
+    }
+
+    // Find unchanged blocks at the end.
+    var oldTail = oldBlocks.length - 1;
+    var newTail = newBlocks.length - 1;
+
+    while (
+      oldTail >= firstChanged &&
+      newTail >= firstChanged &&
+      oldBlocks[oldTail].outerHTML ===
+        newBlocks[newTail].outerHTML
+    ) {
+      oldTail--;
+      newTail--;
+    }
 
     tab.parsedHtml = html;
     preview.innerHTML = html;
@@ -412,19 +503,28 @@ function handleLiveReadResult(data) {
     renderAllDiagrams(preview);
     resolveLocalImages();
 
-    /* Highlight newly appended top-level Markdown blocks. */
-    if (hasAppendedBlocks) {
-      var newBlocks = Array.from(preview.children)
-        .slice(oldBlockCount);
+    // Highlight all affected blocks in the updated document.
+    var changedBlocks = Array.from(preview.children)
+      .slice(firstChanged, newTail + 1);
 
-      newBlocks.forEach(function(block) {
-        block.classList.add('live-read-new-block');
+    // If blocks were only deleted, highlight the nearest
+    // surviving block to show where the change happened.
+    if (
+      changedBlocks.length === 0 &&
+      oldPreview.innerHTML !== newPreview.innerHTML &&
+      preview.children.length > 0
+    ) {
+      var nearestIndex = Math.min(
+        firstChanged,
+        preview.children.length - 1
+      );
 
-        setTimeout(function() {
-          block.classList.remove('live-read-new-block');
-        }, 3000);
-      });
+      changedBlocks.push(preview.children[nearestIndex]);
     }
+
+    changedBlocks.forEach(function(block) {
+      block.classList.add('live-read-new-block');
+    });
 
     requestAnimationFrame(function() {
       var currentTab = TabManager.getActiveTab();
@@ -434,8 +534,28 @@ function handleLiveReadResult(data) {
         previewContainer.scrollHeight -
         previewContainer.clientHeight;
 
-      previewContainer.scrollTop =
-        scrollRatio * Math.max(0, newMaxScroll);
+      if (followModeEnabled && liveReadEnabled &&
+          liveChangePosition >= 0) {
+
+        var textBeforeChange =
+          newContent.slice(0, liveChangePosition);
+
+        var changedLine =
+          textBeforeChange.split('\n').length - 1;
+
+        var totalLines =
+          Math.max(1, newContent.split('\n').length);
+
+        var changeRatio = changedLine / totalLines;
+
+        previewContainer.scrollTop =
+          Math.max(0, newMaxScroll * changeRatio);
+
+      } else {
+        // Preserve reading position when Follow Mode is OFF.
+        previewContainer.scrollTop =
+          scrollRatio * Math.max(0, newMaxScroll);
+      }
 
       updateReadingIndicators();
     });
@@ -456,7 +576,25 @@ function handleLiveReadResult(data) {
   }
 
   console.log('Live Read: refreshed', tab.path);
+
 }
+
+// Clear Live Read highlights when the user clicks inside
+// the document. Scrolling alone does not clear them.
+document.getElementById('content')
+  .addEventListener('pointerdown', function(event) {
+    if (!event.target.closest(
+      '#editor-container, #preview-container'
+    )) {
+      return;
+    }
+
+    document.querySelectorAll(
+      '#preview .live-read-new-block'
+    ).forEach(function(block) {
+      block.classList.remove('live-read-new-block');
+    });
+  });
 
 // Poll only the active file; no folder watching.
 setInterval(function() {
@@ -3270,3 +3408,8 @@ document.getElementById('save-conflict-overwrite')
 
     sendToRust('overwrite_file', data);
   });
+
+document.getElementById('btn-follow')
+  .addEventListener('click', toggleFollowMode);
+
+updateFollowButton();

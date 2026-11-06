@@ -769,7 +769,8 @@ body.preview-resizing #preview {
 }
 
 /* Live Read status-bar toggle */
-#btn-live-read {
+#btn-live-read,
+#btn-follow {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -782,15 +783,17 @@ body.preview-resizing #preview {
   font-size: 10px;
   cursor: pointer;
   white-space: nowrap;
-  margin: 10px 10px;
+  margin: 2px 6px;
 }
 
-#btn-live-read:hover {
+#btn-live-read:hover,
+#btn-follow:hover {
   color: var(--text);
   background: var(--bg-raised);
 }
 
-#btn-live-read.active {
+#btn-live-read.active,
+#btn-follow.active {
   color: var(--accent);
   border-color: var(--accent);
 }
@@ -2164,9 +2167,8 @@ mark.find-match.find-active {
 /* Temporary highlight for appended Markdown */
 #preview .live-read-new-block {
   border-radius: 4px;
-  background-color: rgba(79, 155, 110, 0.13);
-  box-shadow: inset 3px 0 rgba(79, 155, 110, 0.75);
-  animation: live-read-highlight 3s ease-out forwards;
+  background-color: rgba(79, 155, 110, 0.16);
+  box-shadow: inset 3px 0 rgba(79, 155, 110, 0.85);
 }
 
 @keyframes live-read-highlight {
