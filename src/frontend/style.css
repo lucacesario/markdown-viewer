@@ -868,6 +868,15 @@ body.preview-resizing #preview {
   margin: 2px 6px;
 }
 
+/* Left side pipeline separators matching right side stat style */
+#statusbar > #status-file-wrapper {
+  border-left: 1px solid var(--border);
+  padding: 0 10px;
+  margin-left: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 #btn-live-read:hover,
 #btn-follow:hover {
   color: var(--text);
