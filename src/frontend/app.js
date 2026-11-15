@@ -110,6 +110,10 @@ window.__fromRust = function(event, data) {
     case 'file_check_result':
       handleLiveReadResult(data);
       break;
+    case 'file_open_missing':
+      removeRecentFile(data.path);
+      showError('File no longer exists: ' + data.path);
+      break;
     case 'file_opened': {
       addRecentFile(data.path);
       TabManager.createTab(data.path, data.content);
@@ -1315,6 +1319,28 @@ function addRecentFile(path) {
   recent.unshift({ path: path, filename: filename });
   if (recent.length > 10) recent = recent.slice(0, 10);
   try { localStorage.setItem('markdown-viewer-recent', JSON.stringify(recent)); } catch(e) {}
+}
+
+
+function removeRecentFile(path) {
+  if (!path) return;
+
+  var missingPath = path.replace(/\\/g, '/').toLowerCase();
+
+  var recent = getRecentFiles().filter(function(file) {
+    return file.path.replace(/\\/g, '/').toLowerCase() !== missingPath;
+  });
+
+  try {
+    localStorage.setItem(
+      'markdown-viewer-recent',
+      JSON.stringify(recent)
+    );
+  } catch (error) {
+    console.warn('Unable to update Recent Files:', error);
+  }
+
+  showRecentPanel();
 }
 
 function showRecentPanel() {

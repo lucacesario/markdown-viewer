@@ -108,6 +108,15 @@ pub fn handle_ipc_message(
                             }),
                         );
                     }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        send_to_js(
+                            webview,
+                            "file_open_missing",
+                            &serde_json::json!({
+                                "path": p,
+                            }),
+                        );
+                    }
                     Err(e) => send_to_js(
                         webview,
                         "error",
@@ -115,6 +124,7 @@ pub fn handle_ipc_message(
                             "message": format!("Failed to open file: {e}")
                         }),
                     ),
+
                 }
             }
         }
