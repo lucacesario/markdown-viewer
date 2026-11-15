@@ -241,6 +241,13 @@ fn main() {
         .build(&window)
         .expect("Failed to build WebView");
 
+    // Disable the default WebView2 context menu entirely.
+    if let Ok(core) = unsafe { _webview.controller().CoreWebView2() } {
+        if let Ok(settings) = unsafe { core.Settings() } {
+            let _ = unsafe { settings.SetAreDefaultContextMenusEnabled(false) };
+        }
+    }
+
     // window.set_visible(true);
 
     // Store CLI file path to open once JS is ready
