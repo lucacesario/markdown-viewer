@@ -215,6 +215,13 @@ var liveReadRequestId = 0;
 /* Live Read user preference */
 var liveReadEnabled = true;
 
+/* Live Read edit throttle — skip file polling while user is actively typing */
+var liveReadEditThrottle = {
+  lastEditTime: 0,
+  throttleDelay: 2000,
+  timeout: null
+};
+
 
 /* Follow Mode */
 var followModeEnabled = false;
@@ -333,6 +340,7 @@ function checkLiveRead() {
 
   if (!tab || !tab.path) return;
   if (liveReadPending) return;
+  if (isLiveReadEditThrottled()) return;
 
   var now = Date.now();
   if (now - liveReadLastCheck < 1000) return;
@@ -351,6 +359,21 @@ function checkLiveRead() {
     path: tab.path,
     request_id: requestId
   });
+}
+
+function updateLiveReadEditTime() {
+  liveReadEditThrottle.lastEditTime = Date.now();
+  if (liveReadEditThrottle.timeout) {
+    clearTimeout(liveReadEditThrottle.timeout);
+  }
+  liveReadEditThrottle.timeout = setTimeout(function() {
+    liveReadEditThrottle.lastEditTime = 0;
+  }, liveReadEditThrottle.throttleDelay);
+}
+
+function isLiveReadEditThrottled() {
+  return liveReadEditThrottle.lastEditTime > 0 &&
+    Date.now() - liveReadEditThrottle.lastEditTime < liveReadEditThrottle.throttleDelay;
 }
 
 function normalizeLineEndings(text) {
@@ -3398,6 +3421,9 @@ document.addEventListener('DOMContentLoaded', function() {
   showRecentPanel();
   bindPdfOptionsUi();
   sendToRust('ready');
+
+  // Track active editing to throttle Live Read file polling
+  $.editor.addEventListener('input', updateLiveReadEditTime);
 });
 
 /* Live Read status-bar control */
