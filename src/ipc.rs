@@ -124,7 +124,6 @@ pub fn handle_ipc_message(
                             "message": format!("Failed to open file: {e}")
                         }),
                     ),
-
                 }
             }
         }
@@ -287,15 +286,10 @@ pub fn handle_ipc_message(
                     }),
                 );
             }
-        }    
+        }
         "save_conflict_as" => {
             if let Some(original_path) = parsed.path.as_deref() {
-                handle_save_as(
-                    webview,
-                    window,
-                    parsed.content,
-                    Some(original_path),
-                );
+                handle_save_as(webview, window, parsed.content, Some(original_path));
             } else {
                 send_to_js(
                     webview,
@@ -499,11 +493,9 @@ fn handle_save_as(
     };
 
     if let Some(original) = forbidden_path {
-        let normalized_original =
-            original.replace('\\', "/").to_lowercase();
+        let normalized_original = original.replace('\\', "/").to_lowercase();
 
-        let normalized_selected =
-            path.replace('\\', "/").to_lowercase();
+        let normalized_selected = path.replace('\\', "/").to_lowercase();
 
         let same_path = normalized_original == normalized_selected
             || match (
@@ -544,7 +536,6 @@ fn handle_save_as(
     }
 }
 
-
 /*
  * Live Read: read a file without modifying it.
  *
@@ -554,8 +545,7 @@ fn handle_save_as(
 fn read_live_file(path: &str) -> Result<String, String> {
     const MAX_FILE_BYTES: u64 = 4 * 1024 * 1024;
 
-    let file = fs::File::open(path)
-        .map_err(|e| format!("Cannot read file: {e}"))?;
+    let file = fs::File::open(path).map_err(|e| format!("Cannot read file: {e}"))?;
 
     let metadata = file
         .metadata()
@@ -581,8 +571,7 @@ fn read_live_file(path: &str) -> Result<String, String> {
         return Err("File exceeds the 4 MiB Live Read limit.".to_string());
     }
 
-    String::from_utf8(bytes)
-        .map_err(|_| "Live Read requires a UTF-8 text file.".to_string())
+    String::from_utf8(bytes).map_err(|_| "Live Read requires a UTF-8 text file.".to_string())
 }
 
 fn send_to_js(webview: &WebView, event: &str, data: &serde_json::Value) {
