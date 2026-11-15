@@ -1076,12 +1076,20 @@ Do not assume support for features such as:
 Footnotes
 Definition lists
 Math notation
-Mermaid diagrams
 Wiki links
 Admonition blocks
 Custom containers
 YAML front matter rendering
 ```
+Markdown Viewer also supports additional diagram and
+visualisation formats beyond standard GFM, including
+Mermaid, GeoJSON, TopoJSON, and ASCII STL.
+
+These rendering libraries are bundled locally, so they
+do not need to be downloaded when the app starts.
+
+Some map background tiles and remotely hosted resources
+may still require an internet connection.
 
 They may appear as plain text or behave differently unless explicit support is added to Markdown Viewer.
 
@@ -1141,3 +1149,84 @@ The most important Markdown rules to remember are:
 12. Escape special characters with `\` when you need literal Markdown syntax.
 
 Markdown is most effective when the source remains clear and readable even without the rendered preview.
+
+---
+
+# 45. Live Read and Follow Mode
+
+Markdown Viewer can display changes made to a saved Markdown
+file by another application, such as VS Code.
+
+## Live Read
+
+Use the LIVE ON / LIVE OFF button in the status bar.
+
+- LIVE ON automatically detects external changes to the
+  active saved file and refreshes the document.
+- LIVE OFF pauses automatic updates.
+- The setting is remembered between application launches.
+- Unsaved local edits are never automatically replaced.
+
+The active file is checked approximately once per second.
+
+## Follow Mode
+
+Use the FOLLOW ON / FOLLOW OFF button in the status bar.
+
+- FOLLOW ON moves the preview toward externally changed text.
+- FOLLOW OFF preserves your reading position.
+- Follow Mode is OFF by default.
+- The setting is remembered between application launches.
+
+Follow Mode works in Preview and Split view.
+
+Navigation is approximate, particularly for documents
+containing large images, diagrams, or code blocks.
+
+## Persistent change highlighting
+
+When an external update changes the document, affected
+Markdown blocks are highlighted in the preview.
+
+- Highlights remain visible while you scroll.
+- Click inside the document to clear the highlighting.
+- A new external update replaces the previous highlights.
+
+## Working with VS Code
+
+1. Open a saved Markdown file in Markdown Viewer.
+2. Switch to Preview or Split view.
+3. Enable LIVE ON and FOLLOW ON.
+4. Open the same file in VS Code.
+5. Edit a paragraph and save it in VS Code.
+6. Markdown Viewer refreshes, moves toward the change,
+   and highlights the affected content.
+
+## Protecting unsaved edits
+
+If you have unsaved changes in Markdown Viewer, Live Read
+does not replace them.
+
+If the file has also changed externally, Markdown Viewer
+displays a warning.
+
+When saving a conflicted file, you can choose:
+
+- Cancel — keep your unsaved edits without saving.
+- Save As — save your edits to another filename.
+- Overwrite — explicitly replace the on-disk file.
+
+Markdown Viewer checks the disk content again before
+overwriting.
+
+## Recent Files
+
+Recently opened files appear in the Recent Files panel
+and Quick Open (Ctrl+Shift+P).
+
+If a file has been deleted, renamed, or moved, attempting
+to open its old path displays an error and removes that
+entry from the recent history.
+
+Clear Recent Files removes the history only. It does
+not delete your Markdown documents.

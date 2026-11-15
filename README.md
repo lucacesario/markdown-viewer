@@ -17,13 +17,18 @@ Markdown Viewer is built with Rust and WebView2 and is designed for fast startup
 - Built-in searchable Markdown Guide
 - Table of contents / document outline
 - Drag-and-drop file opening
-- Recent files
+- Recent Files and Quick Open, with automatic cleanup of missing files
 - Adjustable preview width
 - Window size and state persistence
 - Configurable PDF export
 - Native Windows file opening
 - `.md` file association support through the installer
 - Lightweight native executable
+- Live Read with automatic external file refresh
+- Follow Mode with persistent change highlighting
+- Unsaved-edit protection and safe-save conflict handling
+- Quick Open and automatic cleanup of missing recent files
+
 
 ## Markdown Support
 
@@ -62,6 +67,78 @@ The editor includes:
 
 Wrapped visual lines remain part of the same logical Markdown line and do not receive additional line numbers.
 
+## Live Read and Follow Mode
+
+Markdown Viewer can automatically display changes made to a
+saved Markdown file by another application, such as VS Code.
+
+### Live Read
+
+The status bar contains a LIVE ON / LIVE OFF toggle.
+
+- LIVE ON: Check the active saved file for external changes
+  and refresh the document automatically.
+- LIVE OFF: Pause automatic external file updates.
+- The setting is remembered between application launches.
+- Unsaved local edits are never replaced automatically.
+
+Live Read checks the active file approximately once per
+second. It does not monitor an entire folder.
+
+### Follow Mode
+
+The status bar also contains a FOLLOW ON / FOLLOW OFF toggle.
+
+- FOLLOW ON: Navigate toward the changed section when
+  an external modification is detected.
+- FOLLOW OFF: Preserve the current reading position.
+- Follow Mode is OFF by default.
+- The setting is remembered between application launches.
+
+Follow Mode works in Preview and Split view. Navigation is
+approximate, particularly in documents containing large
+images, diagrams, or code blocks.
+
+### Change highlighting
+
+When an external modification is detected, affected
+Markdown blocks are highlighted in the preview.
+
+The highlight remains visible while scrolling and disappears
+when you click inside the document.
+
+Highlighting works for changed content throughout the
+document, not only newly appended sections.
+
+### Protecting unsaved changes
+
+If the active document has unsaved edits, Live Read does
+not overwrite them.
+
+When the file also changes externally, Markdown Viewer
+displays a warning.
+
+If you attempt to save a document whose on-disk content
+has changed, the application offers three choices:
+
+- Cancel: Keep your unsaved edits without writing the file.
+- Save As: Save your work to a different filename.
+- Overwrite: Explicitly replace the externally changed file.
+
+The application rechecks the disk content before overwriting.
+
+### Recent Files
+
+Markdown Viewer remembers recently opened files and makes
+them available from the Recent Files panel and Quick Open.
+
+If a file has been moved, renamed, or deleted, attempting
+to open its old path displays an error and removes the stale
+entry from Recent Files.
+
+Other recent files remain available. The Clear Recent Files
+button removes only the history, not the actual files.
+
 ## PDF Export
 
 Markdown documents can be exported directly to PDF.
@@ -94,6 +171,7 @@ PDF output is generated using the Windows WebView2 rendering engine.
 | `Ctrl+\\` | Toggle split view |
 | `Ctrl+Shift+O` | Toggle document outline |
 | `Ctrl+P` | Export to PDF |
+| `Ctrl+Shift+P` | Quick Open (files and commands) |
 | `Ctrl++` | Zoom in |
 | `Ctrl+-` | Zoom out |
 | `Ctrl+0` | Reset zoom |

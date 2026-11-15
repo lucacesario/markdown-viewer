@@ -219,13 +219,9 @@ window.__setImage = function(path, dataUri) {
 
 /* Copy code blocks to clipboard */
 document.addEventListener('DOMContentLoaded', function() {
-  var preview = document.getElementById('preview');
-
-  if (!preview) return;
-
-  preview.addEventListener('click', async function(event) {
+  document.addEventListener('click', async function(event) {
     var button = event.target.closest('.code-copy-button');
-    if (!button || !preview.contains(button)) return;
+    if (!button || !button.closest('#preview, #guide-content')) return;
 
     var codeBlock = button.closest('pre');
     var code = codeBlock && codeBlock.querySelector('code');

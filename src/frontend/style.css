@@ -546,6 +546,88 @@ body.preview-resizing #preview {
   display: inline-flex;
 }
 
+/* Code block toolbar inside Markdown Guide */
+
+#guide-content pre.code-block-with-copy {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+}
+
+#guide-content .code-block-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.01);
+}
+
+#guide-content pre.code-block-with-copy code {
+  display: block;
+  padding: 14px 16px 16px;
+}
+
+#guide-content .code-block-language {
+  font-size: 12px;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  font-weight: 600;
+  user-select: none;
+}
+
+#guide-content .code-copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+#guide-content .code-copy-button:hover {
+  background: var(--bg-raised);
+  color: var(--text);
+}
+
+#guide-content .code-copy-button svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#guide-content .code-copy-icon,
+#guide-content .code-check-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#guide-content .code-check-icon,
+#guide-content .code-copy-button.copied .code-copy-icon {
+  display: none;
+}
+
+#guide-content .code-copy-button.copied .code-check-icon {
+  display: inline-flex;
+}
+
+#guide-content .code-copy-button.copied {
+  color: #2f9e44;
+}
+
 /* Syntax highlighting — Catppuccin-inspired */
 #preview pre code .hljs-keyword,
 #preview pre code .hljs-selector-tag {
@@ -2164,27 +2246,9 @@ mark.find-match.find-active {
   }
 }
 
-/* Temporary highlight for appended Markdown */
+/* Persistent highlighting for externally changed Markdown */
 #preview .live-read-new-block {
   border-radius: 4px;
   background-color: rgba(79, 155, 110, 0.16);
   box-shadow: inset 3px 0 rgba(79, 155, 110, 0.85);
-}
-
-@keyframes live-read-highlight {
-  0%, 55% {
-    background-color: rgba(79, 155, 110, 0.13);
-    box-shadow: inset 3px 0 rgba(79, 155, 110, 0.75);
-  }
-
-  100% {
-    background-color: transparent;
-    box-shadow: inset 3px 0 transparent;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #preview .live-read-new-block {
-    animation: none;
-  }
 }
