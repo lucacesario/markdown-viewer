@@ -6,3 +6,10 @@ dist/
 
 test.md
 test2.md
+
+# JavaScript dependencies and temporary Mermaid build tools
+node_modules/
+tools/mermaid-build/
+
+# Keep locally bundled offline diagram libraries
+!src/frontend/vendor/

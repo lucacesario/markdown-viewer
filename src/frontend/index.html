@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <style>/* __CSS__ */</style>
 </head>
 <body>
@@ -96,6 +97,41 @@
 
   <div id="tab-bar"></div>
 
+  <!-- Quick Open -->
+  <div id="quick-open-modal"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Quick Open"
+      aria-hidden="true">
+
+    <div class="quick-open-card">
+      <div class="quick-open-search">
+        <svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.8"
+            aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="m16 16 5 5"/>
+        </svg>
+
+        <input id="quick-open-input"
+              type="text"
+              placeholder="Search files or commands..."
+              autocomplete="off"
+              spellcheck="false">
+      </div>
+
+      <div id="quick-open-results"
+          class="quick-open-results"></div>
+
+      <div class="quick-open-footer">
+        <span>↑ ↓ Navigate</span>
+        <span>Enter Select</span>
+        <span>Esc Close</span>
+      </div>
+    </div>
+  </div>
+
   <div id="find-bar">
     <input id="find-input" type="text" placeholder="Find..." spellcheck="false">
     <span id="find-count"></span>
@@ -143,10 +179,25 @@
   </div>
 
   <div id="statusbar">
-    <span id="status-mode">EDIT</span>
-    <span id="status-file">Untitled</span>
+  <span>mode: <span id="status-mode">EDIT</span></span>
+  <span id="status-file-wrapper">file: <span id="status-file">Untitled</span></span>
 
-    <span id="status-info"></span>
+  <button id="btn-live-read"
+          type="button"
+          aria-pressed="true"
+          title="Pause Live Read">
+    <span class="live-read-dot" aria-hidden="true"></span>
+    <span id="live-read-label">LIVE ON</span>
+  </button>
+
+  <button id="btn-follow"
+        type="button"
+        aria-pressed="false"
+        title="Enable Follow Mode">
+  <span id="follow-label">FOLLOW OFF</span>
+</button>
+
+  <span id="status-info"></span>
 
     <div id="status-editor-stats">
       <span id="status-length">length: 0</span>
@@ -210,6 +261,42 @@
     </div>
 </div>
 
+<div id="save-conflict-modal"
+     class="modal-backdrop"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="save-conflict-title"
+     aria-hidden="true">
+
+  <div class="modal-card">
+    <div class="modal-title" id="save-conflict-title">
+      File changed on disk
+    </div>
+
+    <div class="modal-message">
+      This document was modified outside Markdown Viewer.
+      Saving now may overwrite those changes.
+      Your unsaved edits are preserved.
+    </div>
+
+    <div class="modal-actions">
+      <button id="save-conflict-cancel" type="button">
+        Cancel
+      </button>
+
+      <button id="save-conflict-save-as" type="button">
+        Save As…
+      </button>
+
+      <button id="save-conflict-overwrite"
+              type="button"
+              class="danger">
+        Overwrite
+      </button>
+    </div>
+  </div>
+</div>
+
 <div id="close-confirm-modal" class="modal-backdrop">
   <div class="modal-card">
     <div class="modal-title">Unsaved changes</div>
@@ -245,6 +332,67 @@
     </div>
 
     <div id="guide-content"></div>
+  </div>
+</div>
+
+<!-- Image Lightbox -->
+<div id="image-lightbox" class="modal-backdrop" role="dialog"
+     aria-modal="true" aria-label="Image preview"
+     aria-hidden="true">
+
+  <div class="lightbox-panel">
+    <div class="lightbox-toolbar">
+      <span id="lightbox-title">Image preview</span>
+
+      <div class="lightbox-actions">
+        <button id="lightbox-zoom-out" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+        <span id="lightbox-zoom-label">100%</span>
+        <button id="lightbox-zoom-in" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+        <button id="lightbox-reset" type="button" title="Reset zoom">Reset</button>
+        <button id="lightbox-close" type="button" title="Close" aria-label="Close">×</button>
+      </div>
+    </div>
+
+    <div id="lightbox-viewport" class="lightbox-viewport">
+      <div id="lightbox-canvas" class="lightbox-canvas">
+        <img id="lightbox-image" alt="">
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Save Before Pasting Screenshot -->
+<div id="screenshot-save-modal"
+     class="modal-backdrop"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="screenshot-save-title"
+     aria-hidden="true">
+
+  <div class="modal-card">
+    <h3 id="screenshot-save-title">
+      Save document to paste screenshot
+    </h3>
+
+    <p>
+      Screenshots are stored in a portable asset folder
+      beside your Markdown document.
+    </p>
+
+    <p>
+      Save the document first to insert this screenshot.
+    </p>
+
+    <div class="modal-actions">
+      <button id="screenshot-save-cancel" type="button">
+        Cancel
+      </button>
+
+      <button id="screenshot-save-confirm" class="primary" type="button">
+        Save &amp; Paste
+      </button>
+    </div>
   </div>
 </div>
 

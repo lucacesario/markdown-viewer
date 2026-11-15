@@ -32,10 +32,7 @@ pub fn load_window_state() -> ((i32, i32), (u32, u32), bool) {
             let size = if state.width > 1600 || state.height > 1000 {
                 DEFAULT_SIZE
             } else {
-                (
-                    state.width.max(800),
-                    state.height.max(600),
-                )
+                (state.width.max(800), state.height.max(600))
             };
 
             let x = if state.x.abs() <= 10000 {
@@ -57,11 +54,7 @@ pub fn load_window_state() -> ((i32, i32), (u32, u32), bool) {
     (DEFAULT_POS, DEFAULT_SIZE, false)
 }
 
-pub fn save_window_state(
-    pos: (i32, i32),
-    size: (u32, u32),
-    maximized: bool,
-) {
+pub fn save_window_state(pos: (i32, i32), size: (u32, u32), maximized: bool) {
     let state = WindowState {
         x: pos.0,
         y: pos.1,
@@ -76,8 +69,5 @@ pub fn save_window_state(
         let _ = fs::create_dir_all(parent);
     }
 
-    let _ = fs::write(
-        &path,
-        serde_json::to_string(&state).unwrap_or_default(),
-    );
+    let _ = fs::write(&path, serde_json::to_string(&state).unwrap_or_default());
 }

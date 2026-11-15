@@ -17,8 +17,33 @@ var TabManager = (function() {
     }
 
     var active = getActiveTab();
+
+    
+    // The Recent Files screen is only a startup placeholder.
+    // Clicking New should replace it, not create another tab.
+    if (
+      !path &&
+      active &&
+      active.showRecent &&
+      !active.path &&
+      !active.dirty &&
+      active.content === ''
+    ) {
+      active.showRecent = false;
+      active.filename = forceFilename || 'Untitled';
+      active.mode = forceMode || 'edit';
+      active.parsedHtml = null;
+
+      restoreTabState(active);
+      renderTabBar();
+      updateWindowTitle();
+
+      return active;
+    }
+
     if (active && !active.path && !active.dirty && active.content === '' && path) {
       active.path = normalizePath(path);
+      active.showRecent = false;
       active.filename = path.split(/[/\\]/).pop();
       active.content = content != null ? content : '';
       active.dirty = false;
@@ -41,7 +66,8 @@ var TabManager = (function() {
       scrollTop: 0,
       cursorStart: 0,
       cursorEnd: 0,
-      parsedHtml: null
+      parsedHtml: null,
+      lineEnding: null
     };
     tabs.push(tab);
     switchTab(id);
@@ -133,11 +159,20 @@ var TabManager = (function() {
       if (tab.parsedHtml) {
         document.getElementById('preview').innerHTML = tab.parsedHtml;
       } else {
-        var html = marked.parse(tab.content);
+        var html = renderMarkdownSafe(tab.content);
         document.getElementById('preview').innerHTML = html;
         tab.parsedHtml = html;
       }
-      if (typeof resolveLocalImages === 'function') resolveLocalImages();
+
+      restoreCodeCopyIcons(document.getElementById('preview'));
+
+      if (typeof renderAllDiagrams === 'function') {
+        renderAllDiagrams(document.getElementById('preview'));
+      }
+
+      if (typeof resolveLocalImages === 'function') {
+        resolveLocalImages();
+      }
     } else {
       if (tab.mode !== currentMode) {
         toggleMode();
@@ -151,14 +186,24 @@ var TabManager = (function() {
         if (tab.parsedHtml) {
           document.getElementById('preview').innerHTML = tab.parsedHtml;
         } else {
-          var html = marked.parse(tab.content);
+          var html = renderMarkdownSafe(tab.content);
           document.getElementById('preview').innerHTML = html;
           tab.parsedHtml = html;
         }
-        if (typeof resolveLocalImages === 'function') resolveLocalImages();
-        setTimeout(function() {
-          document.getElementById('preview-container').scrollTop = tab.scrollTop;
-        }, 0);
+
+      restoreCodeCopyIcons(document.getElementById('preview'));
+
+      if (typeof renderAllDiagrams === 'function') {
+        renderAllDiagrams(document.getElementById('preview'));
+      }
+
+      if (typeof resolveLocalImages === 'function') {
+        resolveLocalImages();
+      }
+
+      setTimeout(function() {
+        document.getElementById('preview-container').scrollTop = tab.scrollTop;
+      }, 0);
       }
     }
 
@@ -166,6 +211,15 @@ var TabManager = (function() {
     if (typeof updateWordCount === 'function') updateWordCount();
     if (typeof showRecentPanel === 'function') showRecentPanel();
     if (typeof tocOpen !== 'undefined' && tocOpen && typeof updateTOC === 'function') updateTOC();
+
+    if (typeof doFind === 'function' &&
+        typeof findState !== 'undefined' &&
+        findState.open) {
+      doFind(document.getElementById('find-input').value);
+    } else if (typeof updateEditorSearchHighlights === 'function' &&
+              editorSearchLayer) {
+      updateEditorSearchHighlights();
+    }
   }
 
   function markDirty(id) {
@@ -261,6 +315,10 @@ var TabManager = (function() {
     return tabs.find(function(t) { return t.id === activeTabId; }) || null;
   }
 
+  function getTab(id) {
+    return tabs.find(function(t) { return t.id === id; }) || null;
+  }
+
   function hasAnyDirty() {
     return tabs.some(function(t) { return t.dirty; });
   }
@@ -286,6 +344,7 @@ var TabManager = (function() {
     prevTab: prevTab,
     findTabByPath: findTabByPath,
     getActiveTab: getActiveTab,
+    getTab: getTab,
     hasAnyDirty: hasAnyDirty,
     updateTabPath: updateTabPath
   };

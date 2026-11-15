@@ -10,24 +10,176 @@ function sendToRust(command, data) {
   window.ipc.postMessage(msg);
 }
 
+/*
+ * Open external Markdown links in the default browser.
+ * Keep the Markdown Viewer on its own document.
+ */
+document.addEventListener('click', function(event) {
+  if (!event.target || !event.target.closest) return;
+
+  var link = event.target.closest('a[href]');
+  if (!link) return;
+
+  if (!link.closest('#preview, #guide-content')) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  var href = link.getAttribute('href');
+  if (!href) return;
+
+  // Preserve in-document heading navigation.
+  if (href.charAt(0) === '#') {
+    var target = document.getElementById(
+      decodeURIComponent(href.substring(1))
+    );
+    if (target) target.scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+
+  try {
+    var url = new URL(href, document.baseURI);
+
+    // Only external HTTP(S) URLs can launch the browser.
+    if (
+      (url.protocol === 'https:' || url.protocol === 'http:') &&
+      url.hostname !== 'markdown-viewer.localhost'
+    ) {
+      sendToRust('open_external', { path: url.href });
+    }
+  } catch (error) {
+    console.warn('Invalid Markdown link:', href);
+  }
+});
+
 // Rust calls this to send events to JS
 window.__fromRust = function(event, data) {
   switch (event) {
-    case 'file_opened':
+    case 'screenshot_saved': {
+      var pending = window.pendingScreenshotPaste;
+      window.pendingScreenshotPaste = null;
+
+      if (!pending || !data || !data.path) {
+        showError('Screenshot saved, but no insertion location was found.');
+        break;
+      }
+
+      var activeTab = TabManager.getActiveTab();
+      var editor = document.getElementById('editor');
+
+      // Avoid inserting into the wrong document if tabs changed.
+      if (
+        !activeTab ||
+        activeTab.id !== pending.tabId ||
+        activeTab.path !== pending.documentPath
+      ) {
+        showError(
+          'Screenshot saved, but the active document changed. ' +
+          'Return to the original document to insert its image path.'
+        );
+        break;
+      }
+
+      // Escape spaces and parentheses for Markdown links.
+      var imagePath = encodeURI(
+        data.path.replace(/\\/g, '/')
+      ).replace(/\(/g, '%28').replace(/\)/g, '%29');
+
+      var markdown = '![Screenshot](' + imagePath + ')';
+
+      editor.setRangeText(
+        markdown,
+        pending.start,
+        pending.end,
+        'end'
+      );
+
+      // Programmatic changes need an input event.
+      editor.dispatchEvent(new Event('input', {
+        bubbles: true
+      }));
+
+      // Mark the document dirty immediately.
+      TabManager.markDirty();
+
+      editor.focus();
+
+      console.log('Screenshot saved:', data.path);
+      break;
+    }
+    case 'file_check_result':
+      handleLiveReadResult(data);
+      break;
+    case 'file_open_missing':
+      removeRecentFile(data.path);
+      showError('File no longer exists: ' + data.path);
+      break;
+    case 'file_opened': {
       addRecentFile(data.path);
       TabManager.createTab(data.path, data.content);
+
+      var openedTab = TabManager.getActiveTab();
+      if (openedTab) {
+        openedTab.liveReadDiskContent = data.content;
+        openedTab.liveReadConflict = false;
+        openedTab.lineEnding = detectLineEnding(data.content);
+      }
       break;
-    case 'file_saved':
-      TabManager.markClean();
+    }
+    case 'save_conflict':
+      showSaveConflict(data);
+      break;
+    case 'file_saved': {
+      var editor = document.getElementById('editor');
+      var savedTabId = saveGuard.tabId;
+      var savedContent = saveGuard.content;
+      var savedEditorContent = saveGuard.editorContent;
+      var savedPath = saveGuard.path;
+      saveGuard = { tabId: null, path: null, content: null, editorContent: null, seq: 0 };
+
+      var tab = TabManager.getActiveTab();
+      var savedTab = savedTabId
+        ? TabManager.getTab(savedTabId)
+        : null;
+
+      // Mark the saved tab clean only if it was not edited after the save
+      // was sent. If newer edits exist, keep it dirty. Handle the case where
+      // the user switched tabs during the in-flight save by always addressing
+      // the saved tab, not the currently active one.
+      if (savedTab) {
+        var currentContent = editor.value;
+        if (savedTab.id === (tab ? tab.id : null) && currentContent === savedEditorContent) {
+          TabManager.markClean(savedTab.id);
+        } else if (savedTab.id !== (tab ? tab.id : null)) {
+          // Different tab is active now; the saved tab is unchanged on disk.
+          TabManager.markClean(savedTab.id);
+        } else {
+          // Same tab active, but newer edits exist since the save.
+          TabManager.markDirty(savedTab.id);
+        }
+        savedTab.liveReadDiskContent = savedContent;
+        savedTab.liveReadConflict = false;
+        if (savedPath) {
+          savedTab.lineEnding = detectLineEnding(savedContent);
+        }
+      }
+
+      updateLiveReadWarning();
       if (data.path) {
-        TabManager.updateTabPath(null, data.path);
+        var targetTab = savedTab || tab;
+        if (targetTab) {
+          TabManager.updateTabPath(targetTab.id, data.path);
+        }
+        addRecentFile(data.path);
       }
       onFileSaved();
       break;
+    }
     case 'stdin_opened':
       TabManager.createTab(null, data.content, 'preview', data.title || 'stdin');
       break;
     case 'error':
+      window.pendingScreenshotPaste = null;
       showError(data.message);
       break;
     case 'pdf_path_selected':
@@ -82,6 +234,501 @@ document.addEventListener('DOMContentLoaded', function() {
 // State
 var currentMode = 'edit';
 var splitMode = false;
+
+
+/* Live Read —
+ * Watch only the active, saved document.
+ * Never replace unsaved editor changes.
+ */
+var liveReadPending = null;
+var liveReadLastCheck = 0;
+var liveReadRequestId = 0;
+
+/* Live Read user preference */
+var liveReadEnabled = true;
+
+/* Live Read edit throttle — skip file polling while user is actively typing */
+var liveReadEditThrottle = {
+  lastEditTime: 0,
+  throttleDelay: 2000,
+  timeout: null
+};
+
+
+/* Follow Mode */
+var followModeEnabled = false;
+
+try {
+  followModeEnabled =
+    localStorage.getItem('markdown-viewer-follow-mode') === 'on';
+} catch (error) {
+  // Follow Mode stays off if storage is unavailable.
+}
+
+function updateFollowButton() {
+  var button = document.getElementById('btn-follow');
+  var label = document.getElementById('follow-label');
+  if (!button || !label) return;
+
+  button.classList.toggle('active', followModeEnabled);
+  button.setAttribute('aria-pressed', String(followModeEnabled));
+  button.title = followModeEnabled
+    ? 'Disable Follow Mode'
+    : 'Enable Follow Mode';
+
+  label.textContent = followModeEnabled
+    ? 'FOLLOW ON'
+    : 'FOLLOW OFF';
+}
+
+function toggleFollowMode() {
+  followModeEnabled = !followModeEnabled;
+
+  try {
+    localStorage.setItem(
+      'markdown-viewer-follow-mode',
+      followModeEnabled ? 'on' : 'off'
+    );
+  } catch (error) {
+    console.warn('Unable to save Follow Mode preference:', error);
+  }
+
+  updateFollowButton();
+}
+
+try {
+  liveReadEnabled =
+    localStorage.getItem('markdown-viewer-live-read') !== 'off';
+} catch (error) {
+  // Keep Live Read enabled if storage is unavailable.
+}
+
+function updateLiveReadButton() {
+  var button = document.getElementById('btn-live-read');
+  var label = document.getElementById('live-read-label');
+
+  if (!button || !label) return;
+
+  button.classList.toggle('active', liveReadEnabled);
+  button.setAttribute('aria-pressed', String(liveReadEnabled));
+  button.title = liveReadEnabled
+    ? 'Pause Live Read'
+    : 'Resume Live Read';
+
+  label.textContent = liveReadEnabled ? 'LIVE ON' : 'LIVE OFF';
+}
+
+function updateLiveReadWarning() {
+  var warning = document.getElementById('live-read-warning');
+  var tab = TabManager.getActiveTab();
+
+  if (!warning) return;
+
+  // Only saved, modified documents can pause Live Read / Follow Mode.
+  if (!tab || !tab.path || !tab.dirty) {
+    warning.hidden = true;
+    return;
+  }
+
+  if (tab.liveReadConflict) {
+    warning.textContent =
+      '⚠ File changed on disk — unsaved edits preserved';
+    warning.title =
+      'The file changed externally. Your local edits were not replaced. ' +
+      'Saving now may overwrite the external changes.';
+  } else if (liveReadEnabled || followModeEnabled) {
+    warning.textContent =
+      '⚠ Unsaved changes — Live/Follow paused until saved';
+    warning.title =
+      'Live Read and Follow Mode only apply external file changes ' +
+      'when there are no unsaved edits. Save to resume.';
+  } else {
+    warning.hidden = true;
+    return;
+  }
+
+  warning.hidden = false;
+}
+
+// Create a warning separate from transient status messages.
+var liveReadWarning = document.createElement('span');
+liveReadWarning.id = 'live-read-warning';
+liveReadWarning.textContent =
+  '⚠ File changed on disk — unsaved edits preserved';
+liveReadWarning.title =
+  'The file changed externally. Your local edits were not replaced. ' +
+  'Saving now may overwrite the external changes.';
+liveReadWarning.hidden = true;
+
+document.getElementById('status-info')
+  .insertAdjacentElement('afterend', liveReadWarning);
+
+function toggleLiveRead() {
+  liveReadEnabled = !liveReadEnabled;
+
+  try {
+    localStorage.setItem(
+      'markdown-viewer-live-read',
+      liveReadEnabled ? 'on' : 'off'
+    );
+  } catch (error) {
+    console.warn('Unable to save Live Read preference:', error);
+  }
+
+  updateLiveReadButton();
+
+  if (liveReadEnabled) {
+    liveReadLastCheck = 0;
+    checkLiveRead();
+  }
+}
+
+function checkLiveRead() {
+  if (!liveReadEnabled) return;
+
+  var tab = TabManager.getActiveTab();
+
+  if (!tab || !tab.path) return;
+  if (liveReadPending) return;
+  if (isLiveReadEditThrottled()) return;
+
+  var now = Date.now();
+  if (now - liveReadLastCheck < 1000) return;
+
+  liveReadLastCheck = now;
+  var requestId = ++liveReadRequestId;
+
+  liveReadPending = {
+    tabId: tab.id,
+    path: tab.path,
+    started: now,
+    requestId: requestId
+  };
+
+  sendToRust('check_file_change', {
+    path: tab.path,
+    request_id: requestId
+  });
+}
+
+function updateLiveReadEditTime() {
+  liveReadEditThrottle.lastEditTime = Date.now();
+  if (liveReadEditThrottle.timeout) {
+    clearTimeout(liveReadEditThrottle.timeout);
+  }
+  liveReadEditThrottle.timeout = setTimeout(function() {
+    liveReadEditThrottle.lastEditTime = 0;
+  }, liveReadEditThrottle.throttleDelay);
+}
+
+function isLiveReadEditThrottled() {
+  return liveReadEditThrottle.lastEditTime > 0 &&
+    Date.now() - liveReadEditThrottle.lastEditTime < liveReadEditThrottle.throttleDelay;
+}
+
+function normalizeLineEndings(text) {
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+function detectLineEnding(text) {
+  if (typeof text !== 'string') return '\n';
+  if (text.indexOf('\r\n') !== -1) return '\r\n';
+  if (text.indexOf('\r') !== -1) return '\r';
+  return '\n';
+}
+
+function convertLineEndings(text, toEnding) {
+  if (typeof text !== 'string') return text;
+  var normalized = normalizeLineEndings(text);
+  if (toEnding === '\r\n') return normalized.replace(/\n/g, '\r\n');
+  if (toEnding === '\r') return normalized.replace(/\n/g, '\r');
+  return normalized;
+}
+
+function getContentToSave() {
+  var tab = TabManager.getActiveTab();
+  var editor = document.getElementById('editor');
+  var content = editor.value;
+  if (tab && tab.lineEnding && tab.lineEnding !== '\n') {
+    content = convertLineEndings(content, tab.lineEnding);
+  }
+  return content;
+}
+
+function findLiveChangePosition(oldText, newText) {
+  if (oldText === newText) return -1;
+
+  var oldLines = oldText.split('\n');
+  var newLines = newText.split('\n');
+  var lineCount = Math.min(oldLines.length, newLines.length);
+  var charOffset = 0;
+
+  for (var i = 0; i < lineCount; i++) {
+    if (oldLines[i] !== newLines[i]) {
+      return charOffset;
+    }
+    charOffset += oldLines[i].length + 1;
+  }
+
+  return Math.min(oldText.length, newText.length);
+}
+
+function handleLiveReadResult(data) {
+  var pending = liveReadPending;
+
+  // Ignore manual, outdated or unrelated IPC responses.
+  if (!pending || !data ||
+      data.request_id !== pending.requestId) {
+    return;
+  }
+
+  liveReadPending = null;
+  if (!liveReadEnabled) return;
+
+  var tab = TabManager.getActiveTab();
+
+  // Ignore responses for a document that is no longer active.
+  if (!tab ||
+      tab.id !== pending.tabId ||
+      tab.path !== pending.path ||
+      data.path !== pending.path) {
+    return;
+  }
+
+  if (!data.ok) {
+    // Temporary missing/locked files must not clear the editor.
+    console.warn('Live Read:', data.message);
+    return;
+  }
+
+  // Establish the last known disk version for this tab.
+  if (typeof tab.liveReadDiskContent !== 'string') {
+    tab.liveReadDiskContent = tab.content;
+  }
+
+  // Detect external changes without replacing unsaved local edits.
+  if (tab.dirty) {
+    tab.liveReadConflict =
+      data.content !== tab.liveReadDiskContent;
+
+    updateLiveReadWarning();
+    return;
+  }
+
+  tab.liveReadConflict = false;
+  updateLiveReadWarning();
+
+  var editor = document.getElementById('editor');
+
+  var newContent = data.content;
+  if (typeof newContent !== 'string') return;
+  var normalizedNewContent = normalizeLineEndings(newContent);
+  if (normalizedNewContent === editor.value) {
+    tab.liveReadDiskContent = newContent;
+    return;
+  }
+
+  /* detect content appended after existing Markdown. */
+  var oldContent = editor.value;
+  var liveChangePosition =
+    findLiveChangePosition(oldContent, normalizedNewContent);
+
+  var preview = document.getElementById('preview');
+  var previewContainer =
+    document.getElementById('preview-container');
+
+  var maxScroll =
+    previewContainer.scrollHeight - previewContainer.clientHeight;
+
+  var scrollRatio = maxScroll > 0
+    ? previewContainer.scrollTop / maxScroll
+    : 0;
+
+  var editorScroll = editor.scrollTop;
+  var cursorStart = editor.selectionStart;
+  var cursorEnd = editor.selectionEnd;
+
+  // Update the existing tab, not a new tab.
+  tab.content = newContent;
+  tab.liveReadDiskContent = newContent;
+  tab.liveReadConflict = false;
+  tab.parsedHtml = null;
+  editor.value = newContent;
+
+  // Preserve editor position within the new document length.
+  editor.selectionStart =
+    Math.min(cursorStart, newContent.length);
+  editor.selectionEnd =
+    Math.min(cursorEnd, newContent.length);
+
+  editor.scrollTop = editorScroll;
+
+  // Rebuild the preview only when it is visible.
+  if (splitMode || currentMode === 'preview') {
+
+    // Render the previous document separately so diagram
+    // enhancements and copy buttons don't affect comparison.
+    var oldPreview = document.createElement('div');
+    oldPreview.innerHTML = renderMarkdownSafe(oldContent);
+
+    var html = renderMarkdownSafe(newContent);
+
+    var newPreview = document.createElement('div');
+    newPreview.innerHTML = html;
+
+    var oldBlocks = Array.from(oldPreview.children);
+    var newBlocks = Array.from(newPreview.children);
+
+    // Find unchanged blocks at the beginning.
+    var firstChanged = 0;
+
+    while (
+      firstChanged < oldBlocks.length &&
+      firstChanged < newBlocks.length &&
+      oldBlocks[firstChanged].outerHTML ===
+        newBlocks[firstChanged].outerHTML
+    ) {
+      firstChanged++;
+    }
+
+    // Find unchanged blocks at the end.
+    var oldTail = oldBlocks.length - 1;
+    var newTail = newBlocks.length - 1;
+
+    while (
+      oldTail >= firstChanged &&
+      newTail >= firstChanged &&
+      oldBlocks[oldTail].outerHTML ===
+        newBlocks[newTail].outerHTML
+    ) {
+      oldTail--;
+      newTail--;
+    }
+
+    tab.parsedHtml = html;
+
+    // Replace only changed blocks incrementally instead of full innerHTML replacement.
+    // Preserves unchanged DOM nodes for better performance on large documents.
+
+    // Remove old changed blocks from firstChanged onwards.
+    for (var i = oldBlocks.length - 1; i >= firstChanged; i--) {
+      if (preview.children[i]) {
+        preview.removeChild(preview.children[i]);
+      }
+    }
+
+    // Insert new changed blocks after unchanged beginning blocks.
+    for (var i = firstChanged; i < newBlocks.length; i++) {
+      preview.appendChild(newBlocks[i]);
+    }
+
+    restoreCodeCopyIcons(preview);
+    renderAllDiagrams(preview);
+    resolveLocalImages();
+
+    // Highlight all affected blocks in the updated document.
+    var newChangedCount = Math.max(0, newTail - firstChanged + 1);
+    var changedBlocks = Array.from(preview.children)
+      .slice(firstChanged, firstChanged + newChangedCount);
+
+    // If blocks were only deleted, highlight the nearest
+    // surviving block to show where the change happened.
+    if (
+      changedBlocks.length === 0 &&
+      oldPreview.innerHTML !== newPreview.innerHTML &&
+      preview.children.length > 0
+    ) {
+      var nearestIndex = Math.min(
+        firstChanged,
+        preview.children.length - 1
+      );
+
+      changedBlocks.push(preview.children[nearestIndex]);
+    }
+
+    changedBlocks.forEach(function(block) {
+      block.classList.add('live-read-new-block');
+    });
+
+    requestAnimationFrame(function() {
+      var currentTab = TabManager.getActiveTab();
+      if (!currentTab || currentTab.id !== pending.tabId) return;
+
+      var newMaxScroll =
+        previewContainer.scrollHeight -
+        previewContainer.clientHeight;
+
+      if (followModeEnabled && liveReadEnabled &&
+          liveChangePosition >= 0) {
+
+        var textBeforeChange =
+          normalizedNewContent.slice(0, liveChangePosition);
+
+        var changedLine =
+          textBeforeChange.split('\n').length - 1;
+
+        var totalLines =
+          Math.max(1, normalizedNewContent.split('\n').length);
+
+        var changeRatio = changedLine / totalLines;
+
+        previewContainer.scrollTop =
+          Math.max(0, newMaxScroll * changeRatio);
+
+      } else {
+        // Preserve reading position when Follow Mode is OFF.
+        previewContainer.scrollTop =
+          scrollRatio * Math.max(0, newMaxScroll);
+      }
+
+      updateReadingIndicators();
+    });
+  }
+
+  if (typeof updateLineNumbers === 'function') {
+    updateLineNumbers();
+  }
+
+  if (typeof updateWordCount === 'function') {
+    updateWordCount();
+  }
+
+  if (typeof tocOpen !== 'undefined' &&
+      tocOpen &&
+      typeof updateTOC === 'function') {
+    updateTOC();
+  }
+
+  console.log('Live Read: refreshed', tab.path);
+
+}
+
+// Clear Live Read highlights when the user clicks inside
+// the document. Scrolling alone does not clear them.
+document.getElementById('content')
+  .addEventListener('pointerdown', function(event) {
+    if (!event.target.closest(
+      '#editor-container, #preview-container'
+    )) {
+      return;
+    }
+
+    document.querySelectorAll(
+      '#preview .live-read-new-block'
+    ).forEach(function(block) {
+      block.classList.remove('live-read-new-block');
+    });
+  });
+
+// Poll only the active file; no folder watching.
+setInterval(function() {
+  if (liveReadPending &&
+      Date.now() - liveReadPending.started > 5000) {
+    liveReadPending = null;
+  }
+  updateLiveReadWarning();
+  checkLiveRead();
+}, 1000);
 
 // Cross-mode selection helpers
 function selectInPreview(text, ratio) {
@@ -178,10 +825,12 @@ function toggleMode() {
     if (tab && tab.parsedHtml) {
       previewEl.innerHTML = tab.parsedHtml;
     } else {
-      var html = marked.parse(content);
+      var html = renderMarkdownSafe(content);
       previewEl.innerHTML = html;
       if (tab) tab.parsedHtml = html;
     }
+    restoreCodeCopyIcons(previewEl);
+    renderAllDiagrams(previewEl);
     resolveLocalImages();
     ($.editorContainer || document.getElementById('editor-container')).classList.remove('active');
     ($.previewContainer || document.getElementById('preview-container')).classList.add('active');
@@ -218,6 +867,8 @@ function toggleMode() {
     }
     if (findState.open) doFind(($.findInput || document.getElementById('find-input')).value);
   }
+
+  requestAnimationFrame(updateReadingIndicators);
 }
 
 function setTitle(title) {
@@ -265,10 +916,12 @@ function toggleSplit() {
     if (splitTab && splitTab.parsedHtml) {
       splitPreviewEl.innerHTML = splitTab.parsedHtml;
     } else {
-      var splitHtml = marked.parse(splitContent);
+      var splitHtml = renderMarkdownSafe(splitContent);
       splitPreviewEl.innerHTML = splitHtml;
       if (splitTab) splitTab.parsedHtml = splitHtml;
     }
+    restoreCodeCopyIcons(splitPreviewEl);
+    renderAllDiagrams(splitPreviewEl);
     resolveLocalImages();
     currentMode = 'edit';
     document.getElementById('btn-toggle').classList.remove('active');
@@ -277,6 +930,8 @@ function toggleSplit() {
     iconEdit.style.display = 'none';
     document.getElementById('editor').focus();
   }
+
+  requestAnimationFrame(updateReadingIndicators);
 }
 
 var splitPreviewTimer = null;
@@ -317,9 +972,11 @@ function updateSplitPreview() {
         editor.value;
 
       var html =
-        marked.parse(content);
+        renderMarkdownSafe(content);
 
       preview.innerHTML = html;
+      restoreCodeCopyIcons(preview);
+      renderAllDiagrams(preview);
 
       if (tab) {
         tab.parsedHtml = html;
@@ -337,6 +994,8 @@ function updateSplitPreview() {
           previewContainer,
           scrollRatio
         );
+
+        updateReadingIndicators();
       });
 
     }, 150);
@@ -447,6 +1106,85 @@ document
     syncPreviewToEditor
   );
 
+document.getElementById('preview-container')
+  .addEventListener('scroll', updateReadingIndicators);
+
+/* Reading time and progress */
+
+var READING_WORDS_PER_MINUTE = 225;
+
+function updateReadingIndicators() {
+  var editor = document.getElementById('editor');
+  var wordCount = document.getElementById('status-counts');
+  var previewContainer = document.getElementById('preview-container');
+
+  if (!editor || !wordCount || !previewContainer) return;
+
+  var readingInfo = document.getElementById('status-reading');
+
+  // Create the status bar elements once.
+  if (!readingInfo) {
+    readingInfo = document.createElement('span');
+    readingInfo.id = 'status-reading';
+    readingInfo.className = 'reading-status';
+    wordCount.insertAdjacentElement('afterend', readingInfo);
+  }
+
+  var progressInfo = document.getElementById('status-reading-progress');
+
+  if (!progressInfo) {
+    progressInfo = document.createElement('span');
+    progressInfo.id = 'status-reading-progress';
+    progressInfo.className = 'reading-progress-status';
+
+    var progressText = document.createElement('span');
+    progressText.className = 'reading-progress-text';
+
+    var track = document.createElement('span');
+    track.className = 'reading-progress-track';
+
+    var fill = document.createElement('span');
+    fill.className = 'reading-progress-fill';
+    track.appendChild(fill);
+
+    progressInfo.appendChild(progressText);
+    progressInfo.appendChild(track);
+
+    readingInfo.insertAdjacentElement('afterend', progressInfo);
+  }
+
+  // Count words using the same simple method as the status bar.
+  var text = editor.value.trim();
+  var words = text ? text.split(/\s+/).length : 0;
+
+  var minutes = words === 0
+    ? 0
+    : Math.max(1, Math.ceil(words / READING_WORDS_PER_MINUTE));
+
+  readingInfo.textContent = minutes + ' min read';
+
+  // Reading progress is only meaningful with a visible preview.
+  var previewVisible = splitMode || currentMode === 'preview';
+
+  progressInfo.style.display = previewVisible ? 'inline-flex' : 'none';
+
+  if (!previewVisible) return;
+
+  var maxScroll =
+    previewContainer.scrollHeight - previewContainer.clientHeight;
+
+  var percentage = maxScroll <= 0
+    ? 100
+    : Math.round((previewContainer.scrollTop / maxScroll) * 100);
+
+  percentage = Math.max(0, Math.min(100, percentage));
+
+  progressInfo.querySelector('.reading-progress-text').textContent =
+    percentage + '%';
+
+  progressInfo.querySelector('.reading-progress-fill').style.width =
+    percentage + '%';
+}
 
 // Word count
 function updateEditorStatus() {
@@ -482,6 +1220,8 @@ function updateEditorStatus() {
     words.toLocaleString() +
     ' word' +
     (words === 1 ? '' : 's');
+
+  updateReadingIndicators();
 }
 
 function updateWordCount() {
@@ -662,6 +1402,17 @@ lineNumberResizeObserver.observe(
   document.getElementById('editor')
 );
 
+// Keep search decorations aligned after layout changes.
+window.addEventListener('resize', function() {
+  if (editorSearchLayer) updateEditorSearchHighlights();
+});
+
+document.getElementById('editor').addEventListener('input', function() {
+  if (findState.open) {
+    doFind(document.getElementById('find-input').value);
+  }
+});
+
 function syncLineNumberScroll() {
   var editor = $.editor || document.getElementById('editor');
   var gutter = document.getElementById('line-numbers');
@@ -669,6 +1420,10 @@ function syncLineNumberScroll() {
   if (!editor || !gutter) return;
 
   gutter.scrollTop = editor.scrollTop;
+  if (editorSearchLayer) {
+    editorSearchLayer.scrollTop = editor.scrollTop;
+    editorSearchLayer.scrollLeft = editor.scrollLeft;
+  }
 }
 
 // Recent Files
@@ -684,6 +1439,28 @@ function addRecentFile(path) {
   recent.unshift({ path: path, filename: filename });
   if (recent.length > 10) recent = recent.slice(0, 10);
   try { localStorage.setItem('markdown-viewer-recent', JSON.stringify(recent)); } catch(e) {}
+}
+
+
+function removeRecentFile(path) {
+  if (!path) return;
+
+  var missingPath = path.replace(/\\/g, '/').toLowerCase();
+
+  var recent = getRecentFiles().filter(function(file) {
+    return file.path.replace(/\\/g, '/').toLowerCase() !== missingPath;
+  });
+
+  try {
+    localStorage.setItem(
+      'markdown-viewer-recent',
+      JSON.stringify(recent)
+    );
+  } catch (error) {
+    console.warn('Unable to update Recent Files:', error);
+  }
+
+  showRecentPanel();
 }
 
 function showRecentPanel() {
@@ -715,6 +1492,33 @@ function showRecentPanel() {
   title.textContent = 'Recent Files';
   panel.appendChild(title);
 
+  
+  // Button to clear the recent files history
+  var clearButton = document.createElement('button');
+  clearButton.type = 'button';
+  clearButton.className = 'recent-clear-button';
+  clearButton.textContent = 'Clear Recent Files';
+
+  clearButton.addEventListener('click', function() {
+    openConfirmModal(
+      'Are you sure you want to clear your recent files? Your actual files will not be deleted.',
+      function() {
+        try {
+          localStorage.removeItem('markdown-viewer-recent');
+          showRecentPanel();
+        } catch (e) {
+          showError('Unable to clear recent files.');
+        }
+      },
+      'Clear Recent Files',
+      'Clear'
+    );
+  });
+
+
+  panel.appendChild(clearButton);
+
+
   recent.forEach(function(r) {
     var item = document.createElement('div');
     item.className = 'recent-item';
@@ -739,6 +1543,310 @@ function showRecentPanel() {
 
   panel.classList.add('visible');
 }
+
+/* ============================================
+   Quick Open — Files and Commands
+   ============================================ */
+
+var quickOpenItems = [];
+var quickOpenSelected = 0;
+var quickOpenPreviousFocus = null;
+
+var quickOpenCommands = [
+  {
+    label: 'New Document',
+    description: 'Create a new Markdown tab',
+    keywords: 'new document tab',
+    run: function() {
+      TabManager.createTab(null, '', 'edit', 'Untitled', false);
+    }
+  },
+  {
+    label: 'Open File...',
+    description: 'Choose a file from your computer',
+    keywords: 'open browse file',
+    run: function() {
+      sendToRust('open_file');
+    }
+  },
+  {
+    label: 'Save Document',
+    description: 'Save the active document',
+    keywords: 'save write',
+    run: function() {
+      doSave();
+    }
+  },
+  {
+    label: 'Save As...',
+    description: 'Choose a filename and location',
+    keywords: 'save as rename location',
+    run: function() {
+      sendToRust('save_as', {
+        content: getContentToSave()
+      });
+    }
+  },
+  {
+    label: 'Toggle Preview',
+    description: 'Switch between editing and reading',
+    keywords: 'preview edit read',
+    run: function() {
+      toggleMode();
+    }
+  },
+  {
+    label: 'Toggle Split View',
+    description: 'Show editor and preview together',
+    keywords: 'split view side by side',
+    run: function() {
+      toggleSplit();
+    }
+  },
+  {
+    label: 'Markdown Guide',
+    description: 'Open the Markdown reference guide',
+    keywords: 'guide help markdown',
+    run: function() {
+      openMarkdownGuide();
+    }
+  },
+  {
+    label: 'Export PDF',
+    description: 'Open PDF export options',
+    keywords: 'pdf export print',
+    run: function() {
+      openPdfOptions();
+    }
+  },
+  {
+    label: 'Find in Document',
+    description: 'Search the current Markdown document',
+    keywords: 'find search text',
+    run: function() {
+      openFind();
+    }
+  },
+  {
+    label: 'Table of Contents',
+    description: 'Toggle the document outline',
+    keywords: 'toc outline headings',
+    run: function() {
+      toggleTOC();
+    }
+  }
+];
+
+function isQuickOpenVisible() {
+  var modal = document.getElementById('quick-open-modal');
+  return !!modal && modal.classList.contains('visible');
+}
+
+function openQuickOpen() {
+  var modal = document.getElementById('quick-open-modal');
+  var input = document.getElementById('quick-open-input');
+
+  if (isQuickOpenVisible()) return;
+
+  quickOpenPreviousFocus = document.activeElement;
+
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+
+  input.value = '';
+  quickOpenSelected = 0;
+
+  renderQuickOpen();
+  input.focus();
+}
+
+function closeQuickOpen() {
+  var modal = document.getElementById('quick-open-modal');
+
+  if (!isQuickOpenVisible()) return;
+
+  var target = quickOpenPreviousFocus;
+  quickOpenPreviousFocus = null;
+
+  // Restore focus before marking the modal hidden.
+  if (target && target.isConnected &&
+      typeof target.focus === 'function') {
+    target.focus();
+  } else {
+    document.getElementById('editor').focus();
+  }
+
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function renderQuickOpen() {
+  var input = document.getElementById('quick-open-input');
+  var results = document.getElementById('quick-open-results');
+  var query = input.value.trim().toLowerCase();
+
+  var commands = quickOpenCommands
+    .filter(function(command) {
+      return (
+        command.label.toLowerCase().includes(query) ||
+        command.description.toLowerCase().includes(query) ||
+        command.keywords.toLowerCase().includes(query)
+      );
+    })
+    .map(function(command) {
+      return {
+        type: 'command',
+        label: command.label,
+        description: command.description,
+        run: command.run
+      };
+    });
+
+  var files = getRecentFiles()
+    .filter(function(file) {
+      return (
+        String(file.filename || '').toLowerCase().includes(query) ||
+        String(file.path || '').toLowerCase().includes(query)
+      );
+    })
+    .map(function(file) {
+      return {
+        type: 'file',
+        label: file.filename || file.path,
+        description: file.path,
+        path: file.path
+      };
+    });
+
+  // Commands first, recent files second.
+  quickOpenItems = commands.concat(files);
+
+  results.replaceChildren();
+
+  if (!quickOpenItems.length) {
+    var empty = document.createElement('div');
+    empty.className = 'quick-open-empty';
+    empty.textContent = 'No matching files or commands';
+    results.appendChild(empty);
+    quickOpenSelected = -1;
+    return;
+  }
+
+  quickOpenSelected = Math.max(
+    0,
+    Math.min(quickOpenSelected, quickOpenItems.length - 1)
+  );
+
+  quickOpenItems.forEach(function(entry, index) {
+    var item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'quick-open-item';
+
+    if (index === quickOpenSelected) {
+      item.classList.add('selected');
+    }
+
+    var name = document.createElement('span');
+    name.className = 'quick-open-filename';
+    name.textContent = entry.label;
+
+    var description = document.createElement('span');
+    description.className = 'quick-open-path';
+    description.textContent = entry.description;
+
+    item.appendChild(name);
+    item.appendChild(description);
+
+    item.addEventListener('mouseenter', function() {
+      quickOpenSelected = index;
+      updateQuickOpenSelection();
+    });
+
+    item.addEventListener('click', function() {
+      activateQuickOpenItem(index);
+    });
+
+    results.appendChild(item);
+  });
+}
+
+function updateQuickOpenSelection() {
+  var items = document.querySelectorAll('.quick-open-item');
+
+  items.forEach(function(item, index) {
+    item.classList.toggle(
+      'selected',
+      index === quickOpenSelected
+    );
+  });
+
+  if (items[quickOpenSelected]) {
+    items[quickOpenSelected].scrollIntoView({
+      block: 'nearest'
+    });
+  }
+}
+
+function activateQuickOpenItem(index) {
+  var entry = quickOpenItems[index];
+
+  if (!entry) return;
+
+  closeQuickOpen();
+
+  if (entry.type === 'command') {
+    entry.run();
+  } else if (entry.type === 'file' && entry.path) {
+    sendToRust('open_file', {
+      path: entry.path
+    });
+  }
+}
+
+document.getElementById('quick-open-input')
+  .addEventListener('input', function() {
+    quickOpenSelected = 0;
+    renderQuickOpen();
+  });
+
+document.getElementById('quick-open-input')
+  .addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (quickOpenItems.length) {
+        quickOpenSelected =
+          (quickOpenSelected + 1) % quickOpenItems.length;
+        updateQuickOpenSelection();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (quickOpenItems.length) {
+        quickOpenSelected =
+          (quickOpenSelected - 1 + quickOpenItems.length) %
+          quickOpenItems.length;
+        updateQuickOpenSelection();
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      activateQuickOpenItem(quickOpenSelected);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeQuickOpen();
+    }
+  });
+
+document.getElementById('quick-open-modal')
+  .addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeQuickOpen();
+    }
+  });
 
 // Table of Contents
 var tocOpen = false;
@@ -813,12 +1921,106 @@ function toggleTOC() {
   if (tocOpen) updateTOC();
 }
 
+var saveConflictPath = null;
+var saveConflictDiskContent = null;
+var saveConflictTabId = null;
+
+// Tracks the most recent save in flight so an asynchronous save response
+// cannot mark newer, unsaved edits clean, and so a delayed change callback
+// cannot re-dirty a successfully saved tab.
+var saveGuard = {
+  tabId: null,
+  path: null,
+  content: null,
+  seq: 0
+};
+var saveSeq = 0;
+
+function showSaveConflict(data) {
+  var tab = TabManager.getActiveTab();
+
+  if (!tab || !data ||
+      tab.path !== data.path ||
+      typeof data.disk_content !== 'string') {
+    return;
+  }
+
+  saveConflictPath = data.path;
+  saveConflictDiskContent = data.disk_content;
+  saveConflictTabId = tab.id;
+
+  var modal = document.getElementById('save-conflict-modal');
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+
+  document.getElementById('save-conflict-cancel').focus();
+}
+
+function closeSaveConflict() {
+  saveConflictPath = null;
+  saveConflictDiskContent = null;
+  saveConflictTabId = null;
+
+  var modal = document.getElementById('save-conflict-modal');
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function getSaveConflictAction() {
+  var tab = TabManager.getActiveTab();
+  var editor = document.getElementById('editor');
+
+  if (!tab ||
+      tab.id !== saveConflictTabId ||
+      tab.path !== saveConflictPath ||
+      typeof saveConflictDiskContent !== 'string') {
+    return null;
+  }
+
+  var content = editor.value;
+  if (tab.lineEnding && tab.lineEnding !== '\n') {
+    content = convertLineEndings(content, tab.lineEnding);
+  }
+
+  return {
+    path: saveConflictPath,
+    content: content,
+    expected_content: saveConflictDiskContent
+  };
+}
+
 function doSave() {
   var tab = TabManager.getActiveTab();
-  var data = { content: document.getElementById('editor').value };
-  if (tab && tab.path) data.path = tab.path;
+  var editor = document.getElementById('editor');
+  var rawContent = editor.value;
+  var content = getContentToSave();
+
+  var data = {
+    content: content
+  };
+
+  if (tab && tab.path) {
+    data.path = tab.path;
+
+    // Rust uses this to detect external changes before writing.
+    if (typeof tab.liveReadDiskContent === 'string') {
+      data.expected_content = tab.liveReadDiskContent;
+    }
+  }
+
+  // Remember what was sent to disk so the asynchronous save response can
+  // tell whether newer edits arrived before it completed.
+  saveGuard = {
+    tabId: tab ? tab.id : null,
+    path: tab ? tab.path : null,
+    content: content,
+    editorContent: rawContent,
+    seq: ++saveSeq
+  };
+
   sendToRust('save_file', data);
 }
+
 
 // Zoom
 var zoomLevel = 1;
@@ -889,6 +2091,94 @@ document.addEventListener('wheel', function(e) {
   });
 })();
 
+
+/* Search highlighting behind the editor textarea */
+var editorSearchLayer = null;
+
+function updateEditorSearchHighlights() {
+  var editor = document.getElementById('editor');
+  if (!editor) return;
+
+  if (!editorSearchLayer) {
+    var parent = editor.parentElement;
+
+    if (getComputedStyle(parent).position === 'static') {
+      parent.style.position = 'relative';
+    }
+
+    editorSearchLayer = document.createElement('div');
+    editorSearchLayer.className = 'editor-search-layer';
+    editorSearchLayer.setAttribute('aria-hidden', 'true');
+
+    parent.insertBefore(editorSearchLayer, editor);
+
+    var background = getComputedStyle(editor).backgroundColor;
+    editorSearchLayer.style.backgroundColor = background;
+
+    editor.style.position = 'relative';
+    editor.style.zIndex = '1';
+    editor.style.backgroundColor = 'transparent';
+  }
+
+  var layer = editorSearchLayer;
+  var style = getComputedStyle(editor);
+  var parentRect = editor.parentElement.getBoundingClientRect();
+  var editorRect = editor.getBoundingClientRect();
+
+  layer.style.left = (editorRect.left - parentRect.left) + 'px';
+  layer.style.top = (editorRect.top - parentRect.top) + 'px';
+  layer.style.width = editorRect.width + 'px';
+  layer.style.height = editorRect.height + 'px';
+
+  [
+    'fontFamily', 'fontSize', 'fontWeight', 'fontStyle',
+    'lineHeight', 'letterSpacing', 'tabSize',
+    'padding', 'border', 'borderRadius',
+    'whiteSpace', 'overflowWrap', 'wordBreak'
+  ].forEach(function(prop) {
+    layer.style[prop] = style[prop];
+  });
+
+  layer.replaceChildren();
+
+  if (findState.open && findState.matches.length) {
+    var content = editor.value;
+    var position = 0;
+    var fragment = document.createDocumentFragment();
+
+    findState.matches.forEach(function(match, index) {
+      fragment.appendChild(
+        document.createTextNode(
+          content.substring(position, match.start)
+        )
+      );
+
+      var mark = document.createElement('mark');
+      mark.className = 'editor-find-match';
+
+      if (index === findState.current) {
+        mark.classList.add('active');
+      }
+
+      mark.textContent = content.substring(match.start, match.end);
+      fragment.appendChild(mark);
+
+      position = match.end;
+    });
+
+    fragment.appendChild(
+      document.createTextNode(content.substring(position))
+    );
+
+    layer.appendChild(fragment);
+  } else {
+    layer.textContent = editor.value;
+  }
+
+  layer.scrollTop = editor.scrollTop;
+  layer.scrollLeft = editor.scrollLeft;
+}
+
 // Find
 var findState = { open: false, matches: [], current: -1, marks: [] };
 
@@ -909,6 +2199,7 @@ function closeFind() {
   clearPreviewHighlights();
   document.getElementById('find-count').textContent = '';
   if (currentMode === 'edit') document.getElementById('editor').focus();
+  updateEditorSearchHighlights();
 }
 
 function doFind(term) {
@@ -955,6 +2246,7 @@ function doFind(term) {
     goToMatch(0);
   }
   updateFindCount();
+  updateEditorSearchHighlights();
 }
 
 function clearPreviewHighlights() {
@@ -970,12 +2262,35 @@ function clearPreviewHighlights() {
 
 function goToMatch(idx) {
   findState.current = idx;
+
   if (currentMode === 'edit') {
     var match = findState.matches[idx];
     var editor = document.getElementById('editor');
-    editor.focus();
-    editor.selectionStart = match.start;
-    editor.selectionEnd = match.end;
+    var findInput = document.getElementById('find-input');
+
+    // Select the current match.
+    editor.setSelectionRange(match.start, match.end);
+
+    // Scroll to the line containing the match.
+    var textBefore = editor.value.substring(0, match.start);
+    var lineNumber = textBefore.split('\n').length - 1;
+
+    var computedStyle = window.getComputedStyle(editor);
+    var lineHeight = parseFloat(computedStyle.lineHeight);
+
+    if (!lineHeight || isNaN(lineHeight)) {
+      lineHeight = parseFloat(computedStyle.fontSize) * 1.8;
+    }
+
+    editor.scrollTop = Math.max(
+      0,
+      lineNumber * lineHeight - editor.clientHeight / 3
+    );
+
+    // Keep typing in Find uninterrupted.
+    if (document.activeElement === findInput) {
+      findInput.focus();
+    }
   } else {
     findState.marks.forEach(function(m) { m.classList.remove('find-active'); });
     var mark = findState.marks[idx];
@@ -983,6 +2298,7 @@ function goToMatch(idx) {
     mark.scrollIntoView({ block: 'center' });
   }
   updateFindCount();
+  updateEditorSearchHighlights();
 }
 
 function findNext() {
@@ -1008,14 +2324,252 @@ document.getElementById('find-input').addEventListener('input', function() {
   doFind(this.value);
 });
 document.getElementById('find-input').addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { closeFind(); e.preventDefault(); }
-  else if (e.key === 'Enter' && !e.shiftKey) { findNext(); e.preventDefault(); }
-  else if (e.key === 'Enter' && e.shiftKey) { findPrev(); e.preventDefault(); }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeFind();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+
+    if (e.shiftKey) {
+      findPrev();
+    } else {
+      findNext();
+    }
+  }
 });
 document.getElementById('find-close').addEventListener('click', closeFind);
 document.getElementById('find-next').addEventListener('click', findNext);
 document.getElementById('find-prev').addEventListener('click', findPrev);
 
+/* Image Lightbox */
+(function() {
+  var modal = document.getElementById('image-lightbox');
+  var image = document.getElementById('lightbox-image');
+  var title = document.getElementById('lightbox-title');
+  var zoomLabel = document.getElementById('lightbox-zoom-label');
+  var viewport = document.getElementById('lightbox-viewport');
+  var canvas = document.getElementById('lightbox-canvas');
+  var zoom = 1;
+  var previousFocus = null;
+
+  function setZoom(value) {
+    zoom = Math.max(0.5, Math.min(4, value));
+    zoomLabel.textContent = Math.round(zoom * 100) + '%';
+
+    if (!image.naturalWidth || !image.naturalHeight) return;
+
+    // Fit the original image inside the viewport at 100%.
+    var availableWidth = Math.max(1, viewport.clientWidth - 40);
+    var availableHeight = Math.max(1, viewport.clientHeight - 40);
+
+    var fit = Math.min(
+      1,
+      availableWidth / image.naturalWidth,
+      availableHeight / image.naturalHeight
+    );
+
+    var width = Math.round(image.naturalWidth * fit * zoom);
+    var height = Math.round(image.naturalHeight * fit * zoom);
+
+    // Change actual layout dimensions, not just visual scale.
+    image.style.width = width + 'px';
+    image.style.height = height + 'px';
+    image.style.transform = 'none';
+
+    canvas.style.width = Math.max(
+      viewport.clientWidth,
+      width + 40
+    ) + 'px';
+
+    canvas.style.height = Math.max(
+      viewport.clientHeight,
+      height + 40
+    ) + 'px';
+
+    // Keep the enlarged image centred initially.
+    viewport.scrollLeft =
+      Math.max(0, (canvas.offsetWidth - viewport.clientWidth) / 2);
+
+    viewport.scrollTop =
+      Math.max(0, (canvas.offsetHeight - viewport.clientHeight) / 2);
+  }
+
+  image.addEventListener('load', function() {
+    if (modal.classList.contains('visible')) {
+      setZoom(zoom);
+    }
+  });
+
+  window.addEventListener('resize', function() {
+    if (modal.classList.contains('visible')) {
+      setZoom(zoom);
+    }
+  });
+
+  function openLightbox(sourceImage) {
+    if (!sourceImage.complete || !sourceImage.naturalWidth) return;
+
+    var src = sourceImage.currentSrc || sourceImage.src;
+    if (!src) return;
+
+    previousFocus = document.activeElement;
+
+    image.src = src;
+    image.alt = sourceImage.alt || '';
+    title.textContent = sourceImage.alt || 'Image preview';
+
+    modal.classList.add('visible');
+    modal.setAttribute('aria-hidden', 'false');
+
+    setZoom(1);
+    document.getElementById('lightbox-close').focus();
+  }
+
+  function closeLightbox() {
+    // Move focus outside the dialog before hiding it.
+    if (
+      previousFocus &&
+      previousFocus.isConnected &&
+      previousFocus !== document.body &&
+      !modal.contains(previousFocus)
+    ) {
+      previousFocus.focus();
+    } else {
+      document.getElementById('editor').focus();
+    }
+
+    modal.classList.remove('visible');
+    modal.setAttribute('aria-hidden', 'true');
+
+    image.removeAttribute('src');
+    image.style.width = '';
+    image.style.height = '';
+
+    canvas.style.width = '';
+    canvas.style.height = '';
+
+    viewport.scrollLeft = 0;
+    viewport.scrollTop = 0;
+
+    zoom = 1;
+    zoomLabel.textContent = '100%';
+    previousFocus = null;
+  }
+
+  // Delegation works even when Markdown previews are rebuilt.
+  document.addEventListener('click', function(event) {
+    if (!event.target || !event.target.closest) return;
+
+    var clickedImage = event.target.closest(
+      '#preview img, #guide-content img'
+    );
+
+    if (clickedImage) {
+      event.preventDefault();
+      openLightbox(clickedImage);
+    }
+  });
+
+  document.getElementById('lightbox-close')
+    .addEventListener('click', closeLightbox);
+
+  document.getElementById('lightbox-zoom-in')
+    .addEventListener('click', function() {
+      setZoom(zoom + 0.25);
+    });
+
+  document.getElementById('lightbox-zoom-out')
+    .addEventListener('click', function() {
+      setZoom(zoom - 0.25);
+    });
+
+  document.getElementById('lightbox-reset')
+    .addEventListener('click', function() {
+      setZoom(1);
+    });
+
+  modal.addEventListener('click', function(event) {
+    if (event.target === modal) closeLightbox();
+  });
+
+  document.addEventListener('keydown', function(event) {
+    if (!modal.classList.contains('visible')) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeLightbox();
+    }
+  }, true);
+})();
+
+/* Save-before-pasting screenshot modal */
+
+function openScreenshotSaveModal() {
+  var modal = document.getElementById('screenshot-save-modal');
+
+  if (!modal) return;
+
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+
+  document.getElementById('screenshot-save-confirm').focus();
+}
+
+function closeScreenshotSaveModal() {
+  var modal = document.getElementById('screenshot-save-modal');
+
+  if (!modal) return;
+
+  // Return focus to the editor before hiding the modal.
+  document.getElementById('editor').focus();
+
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+document.getElementById('screenshot-save-cancel')
+  .addEventListener('click', function() {
+    closeScreenshotSaveModal();
+  });
+
+document.getElementById('screenshot-save-confirm')
+  .addEventListener('click', function() {
+    closeScreenshotSaveModal();
+
+    var tab = TabManager.getActiveTab();
+
+    if (!tab) {
+      showError('No active document to save.');
+      return;
+    }
+
+    // Open the existing native Windows Save As dialog.
+    sendToRust('save_as', {
+      content: getContentToSave()
+    });
+  });
+
+document.getElementById('screenshot-save-modal')
+  .addEventListener('click', function(event) {
+    if (event.target === this) {
+      closeScreenshotSaveModal();
+    }
+  });
+
+document.addEventListener('keydown', function(event) {
+  var modal = document.getElementById('screenshot-save-modal');
+
+  if (
+    event.key === 'Escape' &&
+    modal &&
+    modal.classList.contains('visible')
+  ) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeScreenshotSaveModal();
+  }
+}, true);
 
 // PDF Export
 var pdfExportInProgress = false;
@@ -1232,6 +2786,42 @@ function setPdfPageStyle(options) {
     '}';
 }
 
+function waitForPdfDiagrams(preview) {
+  return new Promise(function(resolve, reject) {
+    var started = Date.now();
+    var timeout = 10000;
+
+    function check() {
+      var diagrams = preview.querySelectorAll(
+        '.mermaid-diagram'
+      );
+
+      var pending = Array.from(diagrams).some(function(diagram) {
+        return (
+          !diagram.querySelector('svg') &&
+          !diagram.classList.contains('mermaid-error')
+        );
+      });
+
+      if (!pending) {
+        resolve();
+        return;
+      }
+
+      if (Date.now() - started > timeout) {
+        reject(new Error(
+          'Mermaid diagrams did not finish rendering.'
+        ));
+        return;
+      }
+
+      setTimeout(check, 50);
+    }
+
+    check();
+  });
+}
+
 function exportPdf(options) {
   options = options || {
     color: 'blue',
@@ -1252,8 +2842,12 @@ function exportPdf(options) {
   var preview =
     document.getElementById('preview');
 
-  var html = marked.parse(editor.value);
+  var html = renderMarkdownSafe(editor.value);
   preview.innerHTML = html;
+  restoreCodeCopyIcons(preview);
+
+  // Convert diagram code blocks before exporting.
+  renderAllDiagrams(preview);
 
   var tab = TabManager.getActiveTab();
 
@@ -1295,15 +2889,31 @@ function exportPdf(options) {
     showPages: options.showPages !== false
   });
 
-  setTimeout(function() {
-    sendToRust('export_pdf');
 
+  waitForPdfDiagrams(preview).then(function() {
+    // Give WebView2 time to complete its layout
+    // before capturing the print document.
     setTimeout(function() {
-      pdfExportInProgress = false;
-    }, 1500);
+      sendToRust('export_pdf');
 
-  }, 250);
-};
+      setTimeout(function() {
+        pdfExportInProgress = false;
+      }, 1500);
+
+    }, 250);
+
+  }).catch(function(error) {
+    pdfExportInProgress = false;
+
+    document.body.classList.remove(
+      'pdf-export',
+      'pdf-paper',
+      'pdf-black'
+    );
+
+    showError('PDF export: ' + error.message);
+});
+}
 
 function bindPdfOptionsUi() {
   var cancelButton = document.getElementById('pdf-cancel');
@@ -1343,9 +2953,10 @@ function openMarkdownGuide() {
 
   if (!modal || !content) return;
 
-  content.innerHTML = marked.parse(
+  content.innerHTML = renderMarkdownSafe(
     window.__MARKDOWN_GUIDE__ || ''
   );
+  restoreCodeCopyIcons(content);
 
   content.scrollTop = 0;
   modal.classList.add('visible');
@@ -1522,6 +3133,29 @@ function prevGuideSearchMatch() {
 document.addEventListener('keydown', function(e) {
   var key = e.key.toLowerCase();
 
+  // Ctrl+Shift+P = Quick Open
+  if (e.ctrlKey && e.shiftKey && key === 'p') {
+    e.preventDefault();
+
+    if (isQuickOpenVisible()) {
+      closeQuickOpen();
+    } else {
+      openQuickOpen();
+    }
+
+    return;
+  }
+
+  // While Quick Open is open, prevent other shortcuts.
+  if (isQuickOpenVisible()) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeQuickOpen();
+    }
+    return;
+  }
+
+
   // Ctrl+G = open Markdown Guide
   // If already open, focus the Guide search box
   if (e.ctrlKey && !e.shiftKey && key === 'g') {
@@ -1594,7 +3228,7 @@ document.addEventListener('keydown', function(e) {
     e.preventDefault();
 
     sendToRust('save_as', {
-      content: document.getElementById('editor').value
+      content: getContentToSave()
     });
 
   // Ctrl+S = Save
@@ -1734,18 +3368,30 @@ document
 
 var confirmAction = null;
 
-function openConfirmModal(message, onConfirm) {
+
+function openConfirmModal(message, onConfirm, title, buttonText) {
   var modal = document.getElementById('close-confirm-modal');
   var messageEl = modal.querySelector('.modal-message');
+  var titleEl = modal.querySelector('.modal-title');
+  var confirmButton = document.getElementById('close-confirm');
 
   if (messageEl) {
     messageEl.textContent = message;
+  }
+
+  if (titleEl) {
+    titleEl.textContent = title || 'Unsaved changes';
+  }
+
+  if (confirmButton) {
+    confirmButton.textContent = buttonText || 'Close';
   }
 
   confirmAction = onConfirm || null;
 
   modal.classList.add('visible');
 }
+
 
 function closeConfirmModal() {
   var modal = document.getElementById('close-confirm-modal');
@@ -1897,5 +3543,52 @@ document.addEventListener('DOMContentLoaded', function() {
   showRecentPanel();
   bindPdfOptionsUi();
   sendToRust('ready');
+
+  // Track active editing to throttle Live Read file polling
+  $.editor.addEventListener('input', updateLiveReadEditTime);
 });
 
+/* Live Read status-bar control */
+document.getElementById('btn-live-read')
+  .addEventListener('click', toggleLiveRead);
+
+updateLiveReadButton();
+
+document.getElementById('save-conflict-cancel')
+  .addEventListener('click', closeSaveConflict);
+
+document.getElementById('save-conflict-save-as')
+  .addEventListener('click', function() {
+    var data = getSaveConflictAction();
+    if (!data) {
+      closeSaveConflict();
+      showError('The active document changed. Save As cancelled.');
+      return;
+    }
+
+    closeSaveConflict();
+
+    sendToRust('save_conflict_as', {
+      path: data.path,
+      content: data.content
+    });
+  });
+
+document.getElementById('save-conflict-overwrite')
+  .addEventListener('click', function() {
+    var data = getSaveConflictAction();
+    if (!data) {
+      closeSaveConflict();
+      showError('The active document changed. Overwrite cancelled.');
+      return;
+    }
+
+    closeSaveConflict();
+
+    sendToRust('overwrite_file', data);
+  });
+
+document.getElementById('btn-follow')
+  .addEventListener('click', toggleFollowMode);
+
+updateFollowButton();

@@ -1,5 +1,5 @@
 #define MyAppName "Markdown Viewer"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppExeName "markdown-viewer.exe"
 #define MyAppPublisher "Luca Cesario"
 
