@@ -20,6 +20,10 @@
       TabManager.markDirty();
       updateWordCount();
 
+      if (typeof updateLiveReadWarning === 'function') {
+        updateLiveReadWarning();
+      }
+
       if (typeof showRecentPanel === 'function') {
         showRecentPanel();
       }
@@ -56,6 +60,10 @@
       editor.dispatchEvent(new Event('input'));
 
       TabManager.markDirty();
+
+      if (typeof updateLiveReadWarning === 'function') {
+        updateLiveReadWarning();
+      }
 
       if (typeof splitMode !== 'undefined' && splitMode) {
         updateSplitPreview();

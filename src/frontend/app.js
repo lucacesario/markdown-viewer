@@ -292,12 +292,30 @@ function updateLiveReadWarning() {
 
   if (!warning) return;
 
-  warning.hidden = !(
-    tab &&
-    tab.path &&
-    tab.dirty &&
-    tab.liveReadConflict
-  );
+  // Only saved, modified documents can pause Live Read / Follow Mode.
+  if (!tab || !tab.path || !tab.dirty) {
+    warning.hidden = true;
+    return;
+  }
+
+  if (tab.liveReadConflict) {
+    warning.textContent =
+      '⚠ File changed on disk — unsaved edits preserved';
+    warning.title =
+      'The file changed externally. Your local edits were not replaced. ' +
+      'Saving now may overwrite the external changes.';
+  } else if (liveReadEnabled || followModeEnabled) {
+    warning.textContent =
+      '⚠ Unsaved changes — Live/Follow paused until saved';
+    warning.title =
+      'Live Read and Follow Mode only apply external file changes ' +
+      'when there are no unsaved edits. Save to resume.';
+  } else {
+    warning.hidden = true;
+    return;
+  }
+
+  warning.hidden = false;
 }
 
 // Create a warning separate from transient status messages.
