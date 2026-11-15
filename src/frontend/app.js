@@ -587,13 +587,13 @@ function handleLiveReadResult(data) {
           liveChangePosition >= 0) {
 
         var textBeforeChange =
-          newContent.slice(0, liveChangePosition);
+          normalizedNewContent.slice(0, liveChangePosition);
 
         var changedLine =
           textBeforeChange.split('\n').length - 1;
 
         var totalLines =
-          Math.max(1, newContent.split('\n').length);
+          Math.max(1, normalizedNewContent.split('\n').length);
 
         var changeRatio = changedLine / totalLines;
 
