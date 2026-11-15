@@ -531,15 +531,31 @@ function handleLiveReadResult(data) {
     }
 
     tab.parsedHtml = html;
-    preview.innerHTML = html;
+
+    // Replace only changed blocks incrementally instead of full innerHTML replacement.
+    // Preserves unchanged DOM nodes for better performance on large documents.
+
+    // Remove old changed blocks from firstChanged onwards.
+    for (var i = oldBlocks.length - 1; i >= firstChanged; i--) {
+      if (preview.children[i]) {
+        preview.removeChild(preview.children[i]);
+      }
+    }
+
+    // Insert new changed blocks after unchanged beginning blocks.
+    var referenceNode = preview.children[firstChanged] || null;
+    for (var i = newBlocks.length - 1; i >= firstChanged; i--) {
+      preview.insertBefore(newBlocks[i], referenceNode);
+    }
 
     restoreCodeCopyIcons(preview);
     renderAllDiagrams(preview);
     resolveLocalImages();
 
     // Highlight all affected blocks in the updated document.
+    var newChangedCount = Math.max(0, newTail - firstChanged + 1);
     var changedBlocks = Array.from(preview.children)
-      .slice(firstChanged, newTail + 1);
+      .slice(firstChanged, firstChanged + newChangedCount);
 
     // If blocks were only deleted, highlight the nearest
     // surviving block to show where the change happened.
