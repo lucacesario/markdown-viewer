@@ -172,8 +172,6 @@ var TabManager = (function() {
       if (typeof resolveLocalImages === 'function') {
         resolveLocalImages();
       }
-
-      if (typeof resolveLocalImages === 'function') resolveLocalImages();
     } else {
       if (tab.mode !== currentMode) {
         toggleMode();
