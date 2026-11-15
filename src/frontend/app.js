@@ -543,9 +543,8 @@ function handleLiveReadResult(data) {
     }
 
     // Insert new changed blocks after unchanged beginning blocks.
-    var referenceNode = preview.children[firstChanged] || null;
-    for (var i = newBlocks.length - 1; i >= firstChanged; i--) {
-      preview.insertBefore(newBlocks[i], referenceNode);
+    for (var i = firstChanged; i < newBlocks.length; i++) {
+      preview.appendChild(newBlocks[i]);
     }
 
     restoreCodeCopyIcons(preview);
