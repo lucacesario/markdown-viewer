@@ -353,6 +353,10 @@ function checkLiveRead() {
   });
 }
 
+function normalizeLineEndings(text) {
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 function findLiveChangePosition(oldText, newText) {
   if (oldText === newText) return -1;
 
@@ -418,7 +422,8 @@ function handleLiveReadResult(data) {
 
   var newContent = data.content;
   if (typeof newContent !== 'string') return;
-  if (newContent === editor.value) {
+  var normalizedNewContent = normalizeLineEndings(newContent);
+  if (normalizedNewContent === editor.value) {
     tab.liveReadDiskContent = newContent;
     return;
   }
@@ -426,7 +431,7 @@ function handleLiveReadResult(data) {
   /* detect content appended after existing Markdown. */
   var oldContent = editor.value;
   var liveChangePosition =
-    findLiveChangePosition(oldContent, newContent);
+    findLiveChangePosition(oldContent, normalizedNewContent);
 
   var preview = document.getElementById('preview');
   var previewContainer =
