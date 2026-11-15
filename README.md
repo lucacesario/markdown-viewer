@@ -185,7 +185,7 @@ When the Markdown Guide is open, `Ctrl+F` focuses the Guide search field.
 The recommended way to install Markdown Viewer is with the Windows installer:
 
 ```text
-Markdown-Viewer-Setup-v1.0.0.exe
+Markdown-Viewer-Setup-v1.1.0.exe
 ```
 
 The installer:
@@ -257,7 +257,7 @@ using Inno Setup Compiler.
 The resulting installer is created in:
 
 ```text
-dist/Markdown-Viewer-Setup-v1.0.0.exe
+dist/Markdown-Viewer-Setup-v1.1.0.exe
 ```
 
 ## Technology

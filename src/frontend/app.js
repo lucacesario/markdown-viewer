@@ -122,27 +122,59 @@ window.__fromRust = function(event, data) {
       if (openedTab) {
         openedTab.liveReadDiskContent = data.content;
         openedTab.liveReadConflict = false;
+        openedTab.lineEnding = detectLineEnding(data.content);
       }
       break;
     }
     case 'save_conflict':
       showSaveConflict(data);
       break;
-    case 'file_saved':
-      TabManager.markClean();
-      var savedTab = TabManager.getActiveTab();
+    case 'file_saved': {
+      var editor = document.getElementById('editor');
+      var savedTabId = saveGuard.tabId;
+      var savedContent = saveGuard.content;
+      var savedEditorContent = saveGuard.editorContent;
+      var savedPath = saveGuard.path;
+      saveGuard = { tabId: null, path: null, content: null, editorContent: null, seq: 0 };
+
+      var tab = TabManager.getActiveTab();
+      var savedTab = savedTabId
+        ? TabManager.getTab(savedTabId)
+        : null;
+
+      // Mark the saved tab clean only if it was not edited after the save
+      // was sent. If newer edits exist, keep it dirty. Handle the case where
+      // the user switched tabs during the in-flight save by always addressing
+      // the saved tab, not the currently active one.
       if (savedTab) {
-        savedTab.liveReadDiskContent =
-          document.getElementById('editor').value;
+        var currentContent = editor.value;
+        if (savedTab.id === (tab ? tab.id : null) && currentContent === savedEditorContent) {
+          TabManager.markClean(savedTab.id);
+        } else if (savedTab.id !== (tab ? tab.id : null)) {
+          // Different tab is active now; the saved tab is unchanged on disk.
+          TabManager.markClean(savedTab.id);
+        } else {
+          // Same tab active, but newer edits exist since the save.
+          TabManager.markDirty(savedTab.id);
+        }
+        savedTab.liveReadDiskContent = savedContent;
         savedTab.liveReadConflict = false;
+        if (savedPath) {
+          savedTab.lineEnding = detectLineEnding(savedContent);
+        }
       }
+
       updateLiveReadWarning();
       if (data.path) {
-        TabManager.updateTabPath(null, data.path);
+        var targetTab = savedTab || tab;
+        if (targetTab) {
+          TabManager.updateTabPath(targetTab.id, data.path);
+        }
         addRecentFile(data.path);
       }
       onFileSaved();
       break;
+    }
     case 'stdin_opened':
       TabManager.createTab(null, data.content, 'preview', data.title || 'stdin');
       break;
@@ -396,6 +428,31 @@ function isLiveReadEditThrottled() {
 
 function normalizeLineEndings(text) {
   return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+function detectLineEnding(text) {
+  if (typeof text !== 'string') return '\n';
+  if (text.indexOf('\r\n') !== -1) return '\r\n';
+  if (text.indexOf('\r') !== -1) return '\r';
+  return '\n';
+}
+
+function convertLineEndings(text, toEnding) {
+  if (typeof text !== 'string') return text;
+  var normalized = normalizeLineEndings(text);
+  if (toEnding === '\r\n') return normalized.replace(/\n/g, '\r\n');
+  if (toEnding === '\r') return normalized.replace(/\n/g, '\r');
+  return normalized;
+}
+
+function getContentToSave() {
+  var tab = TabManager.getActiveTab();
+  var editor = document.getElementById('editor');
+  var content = editor.value;
+  if (tab && tab.lineEnding && tab.lineEnding !== '\n') {
+    content = convertLineEndings(content, tab.lineEnding);
+  }
+  return content;
 }
 
 function findLiveChangePosition(oldText, newText) {
@@ -1526,7 +1583,7 @@ var quickOpenCommands = [
     keywords: 'save as rename location',
     run: function() {
       sendToRust('save_as', {
-        content: document.getElementById('editor').value
+        content: getContentToSave()
       });
     }
   },
@@ -1868,6 +1925,17 @@ var saveConflictPath = null;
 var saveConflictDiskContent = null;
 var saveConflictTabId = null;
 
+// Tracks the most recent save in flight so an asynchronous save response
+// cannot mark newer, unsaved edits clean, and so a delayed change callback
+// cannot re-dirty a successfully saved tab.
+var saveGuard = {
+  tabId: null,
+  path: null,
+  content: null,
+  seq: 0
+};
+var saveSeq = 0;
+
 function showSaveConflict(data) {
   var tab = TabManager.getActiveTab();
 
@@ -1900,6 +1968,7 @@ function closeSaveConflict() {
 
 function getSaveConflictAction() {
   var tab = TabManager.getActiveTab();
+  var editor = document.getElementById('editor');
 
   if (!tab ||
       tab.id !== saveConflictTabId ||
@@ -1908,18 +1977,26 @@ function getSaveConflictAction() {
     return null;
   }
 
+  var content = editor.value;
+  if (tab.lineEnding && tab.lineEnding !== '\n') {
+    content = convertLineEndings(content, tab.lineEnding);
+  }
+
   return {
     path: saveConflictPath,
-    content: document.getElementById('editor').value,
+    content: content,
     expected_content: saveConflictDiskContent
   };
 }
 
 function doSave() {
   var tab = TabManager.getActiveTab();
+  var editor = document.getElementById('editor');
+  var rawContent = editor.value;
+  var content = getContentToSave();
 
   var data = {
-    content: document.getElementById('editor').value
+    content: content
   };
 
   if (tab && tab.path) {
@@ -1930,6 +2007,16 @@ function doSave() {
       data.expected_content = tab.liveReadDiskContent;
     }
   }
+
+  // Remember what was sent to disk so the asynchronous save response can
+  // tell whether newer edits arrived before it completed.
+  saveGuard = {
+    tabId: tab ? tab.id : null,
+    path: tab ? tab.path : null,
+    content: content,
+    editorContent: rawContent,
+    seq: ++saveSeq
+  };
 
   sendToRust('save_file', data);
 }
@@ -2459,7 +2546,7 @@ document.getElementById('screenshot-save-confirm')
 
     // Open the existing native Windows Save As dialog.
     sendToRust('save_as', {
-      content: document.getElementById('editor').value
+      content: getContentToSave()
     });
   });
 
@@ -3141,7 +3228,7 @@ document.addEventListener('keydown', function(e) {
     e.preventDefault();
 
     sendToRust('save_as', {
-      content: document.getElementById('editor').value
+      content: getContentToSave()
     });
 
   // Ctrl+S = Save

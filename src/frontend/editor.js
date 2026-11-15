@@ -14,10 +14,14 @@
       activeTab.parsedHtml = null;
     }
 
+    // Mark the tab dirty immediately on every edit.
+    if (activeTab) {
+      TabManager.markDirty();
+    }
+
     clearTimeout(changeTimer);
 
     changeTimer = setTimeout(function() {
-      TabManager.markDirty();
       updateWordCount();
 
       if (typeof updateLiveReadWarning === 'function') {

@@ -66,7 +66,8 @@ var TabManager = (function() {
       scrollTop: 0,
       cursorStart: 0,
       cursorEnd: 0,
-      parsedHtml: null
+      parsedHtml: null,
+      lineEnding: null
     };
     tabs.push(tab);
     switchTab(id);
@@ -314,6 +315,10 @@ var TabManager = (function() {
     return tabs.find(function(t) { return t.id === activeTabId; }) || null;
   }
 
+  function getTab(id) {
+    return tabs.find(function(t) { return t.id === id; }) || null;
+  }
+
   function hasAnyDirty() {
     return tabs.some(function(t) { return t.dirty; });
   }
@@ -339,6 +344,7 @@ var TabManager = (function() {
     prevTab: prevTab,
     findTabByPath: findTabByPath,
     getActiveTab: getActiveTab,
+    getTab: getTab,
     hasAnyDirty: hasAnyDirty,
     updateTabPath: updateTabPath
   };
