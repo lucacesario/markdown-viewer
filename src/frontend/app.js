@@ -383,17 +383,19 @@ function normalizeLineEndings(text) {
 function findLiveChangePosition(oldText, newText) {
   if (oldText === newText) return -1;
 
-  var position = 0;
-  var limit = Math.min(oldText.length, newText.length);
+  var oldLines = oldText.split('\n');
+  var newLines = newText.split('\n');
+  var lineCount = Math.min(oldLines.length, newLines.length);
+  var charOffset = 0;
 
-  while (
-    position < limit &&
-    oldText.charAt(position) === newText.charAt(position)
-  ) {
-    position++;
+  for (var i = 0; i < lineCount; i++) {
+    if (oldLines[i] !== newLines[i]) {
+      return charOffset;
+    }
+    charOffset += oldLines[i].length + 1;
   }
 
-  return position;
+  return Math.min(oldText.length, newText.length);
 }
 
 function handleLiveReadResult(data) {
