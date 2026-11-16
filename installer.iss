@@ -5,6 +5,7 @@
 
 [Setup]
 AppId={{A8D52C13-20BC-4EC7-BE5A-45B1784D5610}
+AppVerName={#MyAppName} v{#MyAppVersion}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -35,7 +36,7 @@ Name: "desktopicon"; \
     Flags: unchecked
 
 Name: "mdassociation"; \
-    Description: "Register Markdown Viewer for .md files"; \
+    Description: "Add Markdown Viewer to Open with for .md files"; \
     GroupDescription: "File associations:"; \
     Flags: checkedonce
 
@@ -111,8 +112,9 @@ Root: HKCU; \
 
 Root: HKCU; \
     Subkey: "Software\Classes\.md\OpenWithProgids"; \
-    ValueType: none; \
+    ValueType: string; \
     ValueName: "MarkdownViewer.md"; \
+    ValueData: ""; \
     Tasks: mdassociation; \
     Flags: uninsdeletevalue
 
